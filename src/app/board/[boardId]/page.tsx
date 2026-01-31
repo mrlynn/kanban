@@ -9,7 +9,8 @@ import {
 import { ArrowBack } from '@mui/icons-material';
 import Link from 'next/link';
 import { KanbanBoard } from '@/components/KanbanBoard';
-import { ChatSidebar } from '@/components/ChatSidebar';
+import { ActivityStream } from '@/components/ActivityStream';
+import { FloatingChat } from '@/components/FloatingChat';
 
 interface BoardPageProps {
   params: { boardId: string };
@@ -52,6 +53,7 @@ export default function BoardPage({ params }: BoardPageProps) {
         sx={{
           flex: 1,
           py: 3,
+          pl: { xs: 3, md: 38 }, // Make room for activity stream
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -60,8 +62,11 @@ export default function BoardPage({ params }: BoardPageProps) {
         <KanbanBoard boardId={boardId} />
       </Container>
 
-      {/* Chat with Moltbot */}
-      <ChatSidebar boardId={boardId} />
+      {/* Activity Stream - Left sidebar */}
+      <ActivityStream boardId={boardId} />
+
+      {/* Floating Chat with Moltbot */}
+      <FloatingChat boardId={boardId} />
     </Box>
   );
 }
