@@ -21,6 +21,9 @@ import {
   LinearProgress,
   Collapse,
   Tooltip,
+  SwipeableDrawer,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import {
   Close,
@@ -326,11 +329,316 @@ export function TaskDetailDialog({
     }
   };
 
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
   if (!task) return null;
 
   const priorityConfig = task.priority ? PriorityConfig[task.priority] : null;
   const assignee = task.assigneeId ? USERS.find(u => u.id === task.assigneeId) : null;
 
+  // Content shared between Dialog and Drawer
+  const headerContent = (
+    <Box
+      sx={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        p: isMobile ? 2 : 0,
+        pb: 1,
+      }}
+    >
+      <Box sx={{ flex: 1, pr: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
+          {priorityConfig && (
+            <Chip
+              label={`${priorityConfig.icon} ${priorityConfig.label}`}
+              size="small"
+              sx={{
+                bgcolor: alpha(priorityConfig.color, 0.2),
+                color: priorityConfig.color,
+                fontWeight: 600,
+              }}
+            />
+          )}
+          {task.labels?.map((label) => (
+            <Chip
+              key={label}
+              label={label}
+              size="small"
+              sx={{
+                bgcolor: alpha(labelColors[label] || '#6B7280', 0.2),
+                color: labelColors[label] || '#6B7280',
+              }}
+            />
+          ))}
+        </Box>
+        <Typography variant="h6" sx={{ fontSize: isMobile ? '1.1rem' : '1.25rem' }}>
+          {task.title}
+        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1, flexWrap: 'wrap' }}>
+          {task.dueDate && (() => {
+            const status = getDueDateStatus(task.dueDate);
+            const colors = dueDateColors[status];
+            return (
+              <Chip
+                icon={status === 'overdue' ? <Warning sx={{ fontSize: 16 }} /> : <CalendarToday sx={{ fontSize: 16 }} />}
+                label={`Due ${formatDueDate(task.dueDate)}`}
+                size="small"
+                sx={{
+                  fontWeight: 600,
+                  bgcolor: alpha(colors.bg, status === 'normal' ? 0.2 : 0.9),
+                  color: status === 'normal' ? 'text.secondary' : colors.text,
+                  '& .MuiChip-icon': {
+                    color: status === 'normal' ? 'text.secondary' : colors.text,
+                  },
+                }}
+              />
+            );
+          })()}
+          {assignee && (
+            <Chip
+              avatar={
+                <Avatar sx={{ bgcolor: assignee.color, width: 24, height: 24, fontSize: '0.75rem' }}>
+                  {assignee.avatar || assignee.name[0]}
+                </Avatar>
+              }
+              label={assignee.name}
+              size="small"
+              sx={{
+                bgcolor: alpha(assignee.color, 0.15),
+                color: assignee.color,
+                fontWeight: 500,
+              }}
+            />
+          )}
+        </Box>
+      </Box>
+      <Box sx={{ display: 'flex', gap: 1 }}>
+        <IconButton size="small" onClick={() => onEdit(task)}>
+          <Edit fontSize="small" />
+        </IconButton>
+        <IconButton size="small" onClick={onClose}>
+          <Close fontSize="small" />
+        </IconButton>
+      </Box>
+    </Box>
+  );
+
+  // Mobile: Use SwipeableDrawer from bottom
+  if (isMobile) {
+    return (
+      <SwipeableDrawer
+        anchor="bottom"
+        open={open}
+        onClose={onClose}
+        onOpen={() => {}}
+        disableSwipeToOpen
+        PaperProps={{
+          sx: {
+            bgcolor: 'background.paper',
+            borderTopLeftRadius: 16,
+            borderTopRightRadius: 16,
+            maxHeight: '90vh',
+            overflow: 'hidden',
+          },
+        }}
+      >
+        {/* Swipe handle */}
+        <Box
+          sx={{
+            width: 40,
+            height: 4,
+            bgcolor: 'grey.400',
+            borderRadius: 2,
+            mx: 'auto',
+            mt: 1.5,
+            mb: 0.5,
+          }}
+        />
+        
+        {headerContent}
+        
+        <Box sx={{ px: 2, pb: 3, overflow: 'auto', maxHeight: 'calc(90vh - 160px)' }}>
+          {task.description && (
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'pre-wrap' }}>
+                {task.description}
+              </Typography>
+            </Box>
+          )}
+
+          {/* Checklist Section */}
+          <Box sx={{ mb: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+              <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CheckCircleOutline fontSize="small" />
+                Checklist
+                {checklist.length > 0 && (() => {
+                  const { completed, total } = countChecklistItems(checklist);
+                  return (
+                    <Chip
+                      label={`${completed}/${total}`}
+                      size="small"
+                      sx={{ height: 20, fontSize: '0.7rem' }}
+                    />
+                  );
+                })()}
+              </Typography>
+              {checklistUpdating && <CircularProgress size={16} />}
+            </Box>
+            
+            {/* Progress bar */}
+            {checklist.length > 0 && (() => {
+              const { completed, total } = countChecklistItems(checklist);
+              const percent = total > 0 ? (completed / total) * 100 : 0;
+              return (
+                <LinearProgress
+                  variant="determinate"
+                  value={percent}
+                  sx={{
+                    height: 6,
+                    borderRadius: 3,
+                    mb: 2,
+                    bgcolor: alpha('#6B7280', 0.2),
+                    '& .MuiLinearProgress-bar': {
+                      bgcolor: completed === total ? '#22C55E' : '#3B82F6',
+                    },
+                  }}
+                />
+              );
+            })()}
+
+            {/* Simplified checklist for mobile - collapsed nested items */}
+            {checklist.map((item) => (
+              <Box
+                key={item.id}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  py: 0.75,
+                  px: 1,
+                  borderRadius: 1,
+                }}
+              >
+                <Checkbox
+                  checked={item.completed}
+                  onChange={() => handleToggleChecklistItem(item.id)}
+                  size="small"
+                  sx={{ p: 0.5 }}
+                />
+                <Typography
+                  variant="body2"
+                  sx={{
+                    flex: 1,
+                    textDecoration: item.completed ? 'line-through' : 'none',
+                    color: item.completed ? 'text.disabled' : 'text.primary',
+                  }}
+                >
+                  {item.text}
+                  {item.children && item.children.length > 0 && (
+                    <Chip
+                      label={`+${item.children.length}`}
+                      size="small"
+                      sx={{ ml: 1, height: 18, fontSize: '0.65rem' }}
+                    />
+                  )}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+
+          <Divider sx={{ my: 2 }} />
+
+          {/* Tabs for Comments/Activity */}
+          <Tabs
+            value={tabValue}
+            onChange={(e, v) => setTabValue(v)}
+            sx={{ mb: 2, minHeight: 40 }}
+          >
+            <Tab label={`Comments (${comments.length})`} sx={{ minHeight: 40, py: 0 }} />
+            <Tab label={`Activity (${activities.length})`} sx={{ minHeight: 40, py: 0 }} />
+          </Tabs>
+
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+              <CircularProgress size={24} />
+            </Box>
+          ) : (
+            <>
+              {tabValue === 0 && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      placeholder="Add a comment..."
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSubmitComment()}
+                      multiline
+                      maxRows={3}
+                    />
+                    <IconButton
+                      onClick={handleSubmitComment}
+                      disabled={!newComment.trim() || submitting}
+                      color="primary"
+                    >
+                      {submitting ? <CircularProgress size={20} /> : <Send />}
+                    </IconButton>
+                  </Box>
+                  {comments.map((comment) => {
+                    const actor = actorConfig[comment.author];
+                    return (
+                      <Box key={comment.id} sx={{ display: 'flex', gap: 1.5 }}>
+                        <Avatar sx={{ width: 28, height: 28, bgcolor: alpha(actor.color, 0.2), color: actor.color, fontSize: '0.8rem' }}>
+                          {actor.avatar}
+                        </Avatar>
+                        <Box sx={{ flex: 1 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                            <Typography variant="body2" fontWeight={600}>{actor.name}</Typography>
+                            <Typography variant="caption" color="text.secondary">{formatTimeAgo(comment.createdAt)}</Typography>
+                          </Box>
+                          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{comment.content}</Typography>
+                        </Box>
+                      </Box>
+                    );
+                  })}
+                </Box>
+              )}
+              {tabValue === 1 && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  {activities.map((activity) => {
+                    const actor = actorConfig[activity.actor];
+                    return (
+                      <Box key={activity.id} sx={{ display: 'flex', gap: 1.5, py: 0.5 }}>
+                        <Avatar sx={{ width: 24, height: 24, bgcolor: alpha(actor.color, 0.2), color: actor.color }}>
+                          <ActivityIcon action={activity.action} />
+                        </Avatar>
+                        <Box>
+                          <Typography variant="body2">
+                            <strong>{actor.name}</strong>{' '}
+                            {activity.action === 'created' && 'created this task'}
+                            {activity.action === 'moved' && `moved task`}
+                            {activity.action === 'updated' && `updated ${activity.details?.field}`}
+                            {activity.action === 'commented' && 'commented'}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">{formatTimeAgo(activity.timestamp)}</Typography>
+                        </Box>
+                      </Box>
+                    );
+                  })}
+                </Box>
+              )}
+            </>
+          )}
+        </Box>
+      </SwipeableDrawer>
+    );
+  }
+
+  // Desktop: Use Dialog
   return (
     <Dialog
       open={open}

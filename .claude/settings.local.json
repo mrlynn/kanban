@@ -11,7 +11,10 @@
       "Bash(clawdbot --version:*)",
       "Bash(clawdbot config get:*)",
       "WebFetch(domain:docs.openclaw.ai)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(clawdbot --help:*)",
+      "Bash(clawdbot cron --help:*)",
+      "Bash(clawdbot cron:*)"
     ]
   }
 }

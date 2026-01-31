@@ -38,6 +38,7 @@ interface TaskCardProps {
   commentCount?: number;
   unreadMoltbotComments?: number;
   showArchiveButton?: boolean;
+  isMobile?: boolean;
 }
 
 const labelColors: Record<string, string> = {
@@ -121,6 +122,7 @@ export function TaskCard({
   commentCount = 0,
   unreadMoltbotComments = 0,
   showArchiveButton = true,
+  isMobile = false,
 }: TaskCardProps) {
   const {
     attributes,
@@ -146,20 +148,27 @@ export function TaskCard({
     <Card
       ref={setNodeRef}
       style={style}
+      onClick={isMobile && onOpenDetails ? () => onOpenDetails(task) : undefined}
       sx={{
         mb: 1.5,
         cursor: 'grab',
         bgcolor: 'background.paper',
         borderLeft: priorityConfig ? `4px solid ${priorityConfig.color}` : undefined,
+        // Mobile: larger touch target, always show actions
+        minHeight: isMobile ? 80 : 'auto',
         '&:hover': {
           borderColor: 'primary.main',
           '& .task-actions': {
             opacity: 1,
           },
         },
+        // Mobile: actions always visible
+        '& .task-actions': {
+          opacity: isMobile ? 1 : undefined,
+        },
       }}
     >
-      <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+      <CardContent sx={{ p: isMobile ? 2.5 : 2, '&:last-child': { pb: isMobile ? 2.5 : 2 } }}>
         <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
           <Box
             {...attributes}

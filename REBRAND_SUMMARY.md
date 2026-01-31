@@ -69,7 +69,7 @@ Create visual identity:
 ### 🚧 Priority 5: Domain Setup
 
 When ready for launch:
-- [ ] Register moltboard.app
+- [ ] Register kanban.mlynn.org
 - [ ] Configure DNS
 - [ ] Set up Vercel deployment
 - [ ] SSL certificate
@@ -82,7 +82,7 @@ When ready for launch:
 ### New Brand Identity
 
 **Name:** Moltboard
-**Domain:** moltboard.app
+**Domain:** kanban.mlynn.org
 **Tagline:** "Task Management, Evolved"
 **Theme:** Transformation, evolution, molten energy 🔥
 **Colors:** Warm oranges/reds (like Moltbot's fire emoji)

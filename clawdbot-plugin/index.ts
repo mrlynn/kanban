@@ -10,7 +10,7 @@
  * channels:
  *   moltboard:
  *     enabled: true
- *     apiUrl: "https://moltboard.app"
+ *     apiUrl: "https://kanban.mlynn.org"
  *     apiKey: "your-api-key"
  *     pollIntervalMs: 5000
  *     defaultBoardId: "board_xxx"

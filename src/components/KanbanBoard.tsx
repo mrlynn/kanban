@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   DndContext,
   DragOverlay,
   closestCorners,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   DragStartEvent,
@@ -20,6 +21,10 @@ import {
   Alert,
   Button,
   Badge,
+  Tabs,
+  Tab,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import { Archive } from '@mui/icons-material';
 import { Board, Task, Column, Priority } from '@/types/kanban';
@@ -46,11 +51,18 @@ const setLastSeenTime = () => {
 };
 
 export function KanbanBoard({ boardId }: KanbanBoardProps) {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const columnsRef = useRef<HTMLDivElement>(null);
+  
   const [board, setBoard] = useState<Board | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
+  
+  // Mobile column navigation
+  const [activeColumnIndex, setActiveColumnIndex] = useState(0);
   
   // Comment stats for notifications
   const [commentStats, setCommentStats] = useState<Record<string, { total: number; unreadMoltbot: number }>>({});
@@ -71,10 +83,30 @@ export function KanbanBoard({ boardId }: KanbanBoardProps) {
   // Search & Filter state
   const [filters, setFilters] = useState<SearchFilters>(defaultFilters);
 
+  // Handle mobile column tab change
+  const handleColumnTabChange = (_: React.SyntheticEvent, newValue: number) => {
+    setActiveColumnIndex(newValue);
+    // Scroll to the column
+    if (columnsRef.current && isMobile) {
+      const columnWidth = columnsRef.current.scrollWidth / (board?.columns.length || 1);
+      columnsRef.current.scrollTo({
+        left: columnWidth * newValue,
+        behavior: 'smooth',
+      });
+    }
+  };
+
+  // Configure sensors with touch support for mobile
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
         distance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 200,
+        tolerance: 8,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -489,6 +521,38 @@ export function KanbanBoard({ boardId }: KanbanBoardProps) {
         )}
       </Box>
 
+      {/* Mobile Column Tabs */}
+      {isMobile && board.columns.length > 0 && (
+        <Tabs
+          value={activeColumnIndex}
+          onChange={handleColumnTabChange}
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{
+            mb: 1,
+            minHeight: 40,
+            '& .MuiTab-root': {
+              minHeight: 40,
+              py: 1,
+              px: 2,
+              fontSize: '0.8rem',
+              fontWeight: 600,
+            },
+          }}
+        >
+          {board.columns.map((column, index) => (
+            <Tab
+              key={column.id}
+              label={`${column.title} (${getTasksByColumn(column.id).length})`}
+              sx={{
+                textTransform: 'none',
+                color: index === activeColumnIndex ? 'primary.main' : 'text.secondary',
+              }}
+            />
+          ))}
+        </Tabs>
+      )}
+
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
@@ -496,12 +560,21 @@ export function KanbanBoard({ boardId }: KanbanBoardProps) {
         onDragEnd={handleDragEnd}
       >
         <Box
+          ref={columnsRef}
           sx={{
             display: 'flex',
-            gap: 2,
+            gap: { xs: 0, md: 2 },
             flex: 1,
             overflowX: 'auto',
             pb: 2,
+            // Mobile: snap scrolling for columns
+            scrollSnapType: { xs: 'x mandatory', md: 'none' },
+            scrollBehavior: 'smooth',
+            // Hide scrollbar on mobile for cleaner look
+            '&::-webkit-scrollbar': {
+              display: { xs: 'none', md: 'block' },
+            },
+            scrollbarWidth: { xs: 'none', md: 'auto' },
           }}
         >
           {board.columns.map((column) => {
@@ -520,6 +593,7 @@ export function KanbanBoard({ boardId }: KanbanBoardProps) {
                 collapsible={isDoneColumn}
                 defaultVisibleCount={10}
                 commentStats={commentStats}
+                isMobile={isMobile}
               />
             );
           })}
@@ -531,6 +605,7 @@ export function KanbanBoard({ boardId }: KanbanBoardProps) {
               task={activeTask}
               onEdit={() => {}}
               onDelete={() => {}}
+              isMobile={isMobile}
             />
           )}
         </DragOverlay>

@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Box } from '@mui/material';
+import { Box, useMediaQuery, useTheme, Drawer, IconButton } from '@mui/material';
+import { Menu as MenuIcon } from '@mui/icons-material';
 import { Sidebar } from './Sidebar';
 import { ChatPanel } from './ChatPanel';
 import { FloatingChatButton } from './FloatingChatButton';
@@ -13,6 +14,9 @@ interface AppShellProps {
 const SIDEBAR_WIDTH = 280;
 
 export function AppShell({ children }: AppShellProps) {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   // Chat state - lifted here so floating button and panel can share it
   const [chatOpen, setChatOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -64,15 +68,53 @@ export function AppShell({ children }: AppShellProps) {
         bgcolor: 'background.default',
       }}
     >
-      {/* Persistent Sidebar */}
-      <Sidebar width={SIDEBAR_WIDTH} />
+      {/* Mobile Menu Button */}
+      {isMobile && (
+        <IconButton
+          onClick={() => setMobileMenuOpen(true)}
+          sx={{
+            position: 'fixed',
+            top: 16,
+            left: 16,
+            zIndex: theme.zIndex.appBar + 1,
+            bgcolor: 'background.paper',
+            boxShadow: 2,
+            '&:hover': {
+              bgcolor: 'background.paper',
+            },
+          }}
+        >
+          <MenuIcon />
+        </IconButton>
+      )}
+
+      {/* Sidebar - Persistent on desktop, Drawer on mobile */}
+      {isMobile ? (
+        <Drawer
+          anchor="left"
+          open={mobileMenuOpen}
+          onClose={() => setMobileMenuOpen(false)}
+          sx={{
+            '& .MuiDrawer-paper': {
+              width: SIDEBAR_WIDTH,
+              bgcolor: 'background.default',
+            },
+          }}
+        >
+          <Sidebar width={SIDEBAR_WIDTH} onNavigate={() => setMobileMenuOpen(false)} />
+        </Drawer>
+      ) : (
+        <Sidebar width={SIDEBAR_WIDTH} />
+      )}
 
       {/* Main Content Area */}
       <Box
         component="main"
         sx={{
           flex: 1,
-          ml: `${SIDEBAR_WIDTH}px`,
+          ml: isMobile ? 0 : `${SIDEBAR_WIDTH}px`,
+          pt: isMobile ? 8 : 0, // Space for mobile menu button
+          px: isMobile ? 2 : 0,
           minHeight: '100vh',
           display: 'flex',
           flexDirection: 'column',

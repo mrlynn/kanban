@@ -43,6 +43,7 @@ import { Board, Actor } from '@/types/kanban';
 
 interface SidebarProps {
   width: number;
+  onNavigate?: () => void; // Called when a nav item is clicked (for closing mobile drawer)
 }
 
 // Actor config for activity
@@ -106,7 +107,7 @@ function ActionIcon({ action }: { action: string }) {
   }
 }
 
-export function Sidebar({ width }: SidebarProps) {
+export function Sidebar({ width, onNavigate }: SidebarProps) {
   const router = useRouter();
   const { data: session } = useSession();
   const pathname = usePathname();
@@ -122,6 +123,12 @@ export function Sidebar({ width }: SidebarProps) {
   const [activityExpanded, setActivityExpanded] = useState(true);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loadingActivity, setLoadingActivity] = useState(false);
+
+  // Navigation helper - closes mobile drawer after navigation
+  const navigateTo = (path: string) => {
+    router.push(path);
+    onNavigate?.();
+  };
 
   // Get current board ID from pathname
   const currentBoardId = pathname?.startsWith('/board/') 
@@ -185,7 +192,7 @@ export function Sidebar({ width }: SidebarProps) {
         setBoards(prev => [newBoard, ...prev]);
         setCreateDialogOpen(false);
         setNewBoardName('');
-        router.push(`/board/${newBoard.id}`);
+        navigateTo(`/board/${newBoard.id}`);
       }
     } catch (error) {
       console.error('Failed to create board:', error);
@@ -214,7 +221,7 @@ export function Sidebar({ width }: SidebarProps) {
       >
         {/* Logo / Header - Clickable to go home */}
         <Box
-          onClick={() => router.push('/')}
+          onClick={() => navigateTo('/')}
           sx={{
             p: 2,
             display: 'flex',
@@ -277,7 +284,7 @@ export function Sidebar({ width }: SidebarProps) {
                 <ListItem key={board.id} disablePadding>
                   <ListItemButton
                     selected={currentBoardId === board.id}
-                    onClick={() => router.push(`/board/${board.id}`)}
+                    onClick={() => navigateTo(`/board/${board.id}`)}
                     sx={{
                       borderRadius: 1,
                       mb: 0.5,
@@ -348,7 +355,7 @@ export function Sidebar({ width }: SidebarProps) {
                         cursor: 'pointer',
                         '&:hover': { bgcolor: alpha('#ffffff', 0.03) },
                       }}
-                      onClick={() => router.push(`/board/${activity.boardId}`)}
+                      onClick={() => navigateTo(`/board/${activity.boardId}`)}
                     >
                       <Avatar
                         sx={{
@@ -393,7 +400,7 @@ export function Sidebar({ width }: SidebarProps) {
         {/* Settings Link */}
         <Box sx={{ px: 1, mb: 1 }}>
           <ListItemButton
-            onClick={() => router.push('/settings')}
+            onClick={() => navigateTo('/settings')}
             selected={pathname === '/settings'}
             sx={{
               borderRadius: 1,
@@ -495,7 +502,7 @@ export function Sidebar({ width }: SidebarProps) {
         >
           <Typography
             variant="caption"
-            onClick={() => router.push('/privacy')}
+            onClick={() => navigateTo('/privacy')}
             sx={{
               color: 'text.secondary',
               cursor: 'pointer',
@@ -507,7 +514,7 @@ export function Sidebar({ width }: SidebarProps) {
           <Typography variant="caption" color="text.secondary">•</Typography>
           <Typography
             variant="caption"
-            onClick={() => router.push('/terms')}
+            onClick={() => navigateTo('/terms')}
             sx={{
               color: 'text.secondary',
               cursor: 'pointer',

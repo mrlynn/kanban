@@ -3,31 +3,12 @@
  * 
  * Integrates Moltboard as a native messaging channel.
  * 
- * NOTE: Uses internal Clawdbot APIs for inbound message dispatch.
- * These are stable (used by all built-in channels) but not officially exported.
+ * Uses internal Clawdbot APIs for inbound message dispatch.
  */
 
 import { createRequire } from "module";
 import type { ChannelPlugin, ChannelAccountSnapshot, ClawdbotConfig } from "clawdbot/plugin-sdk";
 
-// Helper to resolve Clawdbot internals from the global installation
-function getClawdbotRequire(): NodeRequire | null {
-  // Try common installation paths
-  const paths = [
-    "/opt/homebrew/lib/node_modules/clawdbot/package.json",
-    "/usr/local/lib/node_modules/clawdbot/package.json",
-    "/usr/lib/node_modules/clawdbot/package.json",
-  ];
-  
-  for (const p of paths) {
-    try {
-      return createRequire(p);
-    } catch {
-      continue;
-    }
-  }
-  return null;
-}
 import type { ResolvedMoltboardAccount, MoltboardChannelConfig } from "./types.js";
 import { 
   fetchPendingMessages, 
@@ -39,7 +20,14 @@ import {
 } from "./api.js";
 
 const DEFAULT_POLL_INTERVAL_MS = 5000;
-const DEFAULT_API_URL = "https://www.moltboard.app";
+const DEFAULT_API_URL = "https://kanban.mlynn.org";
+
+// Clawdbot installation paths to try
+const CLAWDBOT_PATHS = [
+  "/opt/homebrew/lib/node_modules/clawdbot/package.json",
+  "/usr/local/lib/node_modules/clawdbot/package.json",
+  "/usr/lib/node_modules/clawdbot/package.json",
+];
 
 /**
  * Resolve account configuration from Clawdbot config
@@ -127,6 +115,37 @@ export const moltboardPlugin: ChannelPlugin<ResolvedMoltboardAccount> = {
     }),
   },
 
+  // Messaging configuration - tells Clawdbot how to resolve targets
+  messaging: {
+    // Normalize target input (board IDs, "default", etc.)
+    normalizeTarget: (target: string) => {
+      const trimmed = target?.trim();
+      if (!trimmed || trimmed === "default") return "default";
+      return trimmed;
+    },
+    // Target resolver configuration
+    targetResolver: {
+      // Accept any target - board IDs, "default", etc.
+      looksLikeId: (target: string) => {
+        const trimmed = target?.trim();
+        // Accept: board_xxx, default, or any non-empty string
+        return Boolean(trimmed && (
+          trimmed === "default" ||
+          trimmed.startsWith("board_") ||
+          /^[a-zA-Z0-9_-]+$/.test(trimmed)
+        ));
+      },
+      hint: "<boardId|default>",
+    },
+    // Format target for display
+    formatTargetDisplay: ({ target, display }: { target: string; display?: string }) => {
+      if (display) return display;
+      if (target === "default") return "Default Board";
+      if (target.startsWith("board_")) return `Board ${target.slice(6, 14)}...`;
+      return target;
+    },
+  },
+
   outbound: {
     deliveryMode: "direct",
     textChunkLimit: 10000,
@@ -184,6 +203,41 @@ export const moltboardPlugin: ChannelPlugin<ResolvedMoltboardAccount> = {
         };
       }
     },
+
+    // Media sending - Moltboard doesn't support media yet, but we need this for outbound to work
+    sendMedia: async ({
+      cfg,
+      to,
+      text,
+      accountId,
+      replyToId,
+    }: {
+      cfg: ClawdbotConfig;
+      to?: string;
+      text?: string;
+      mediaUrl?: string;
+      accountId: string;
+      replyToId?: string;
+    }) => {
+      // Moltboard doesn't support media - just send the text/caption if provided
+      if (text) {
+        const account = resolveMoltboardAccount(cfg, accountId);
+        if (!account.configured) {
+          return { ok: false, error: new Error("Moltboard channel not configured") };
+        }
+        const boardId = to || account.defaultBoardId || "default";
+        const result = await sendMessage(account, {
+          content: text + "\n\n[Media attachments not supported]",
+          boardId,
+          replyTo: replyToId ?? undefined,
+        });
+        return { ok: true, messageId: result.id, channel: "moltboard" };
+      }
+      return {
+        ok: false,
+        error: new Error("Moltboard does not support media attachments"),
+      };
+    },
   },
 
   status: {
@@ -238,39 +292,32 @@ export const moltboardPlugin: ChannelPlugin<ResolvedMoltboardAccount> = {
   gateway: {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     startAccount: async (ctx: any) => {
-      const { account, abortSignal } = ctx;
+      const { account, abortSignal, cfg } = ctx;
 
       if (!account.configured) {
         ctx.log?.warn(`[moltboard:${account.accountId}] Not configured, skipping.`);
         return () => {};
       }
 
-      // Load internal Clawdbot dispatch API using createRequire
-      // This resolves modules from Clawdbot's installation path
-      let dispatchInboundMessageWithDispatcher: any;
-      let loadConfig: any;
-      let createReplyDispatcher: any;
+      // Load internal Clawdbot dispatch API
+      let dispatchInboundMessageWithDispatcher: any = null;
       
-      const clawdbotRequire = getClawdbotRequire();
-      if (clawdbotRequire) {
+      for (const clawdbotPath of CLAWDBOT_PATHS) {
         try {
+          const clawdbotRequire = createRequire(clawdbotPath);
           const dispatchModule = clawdbotRequire("./dist/auto-reply/dispatch.js");
           dispatchInboundMessageWithDispatcher = dispatchModule.dispatchInboundMessageWithDispatcher;
-          
-          const configModule = clawdbotRequire("./dist/config/config.js");
-          loadConfig = configModule.loadConfig;
-          
-          const replyModule = clawdbotRequire("./dist/auto-reply/reply/reply-dispatcher.js");
-          createReplyDispatcher = replyModule.createReplyDispatcher;
-          
-          ctx.log?.info(`[moltboard] Loaded Clawdbot dispatch API successfully`);
+          ctx.log?.info(`[moltboard] Loaded dispatch API from ${clawdbotPath}`);
+          break;
         } catch (err) {
-          ctx.log?.error(`[moltboard] Failed to load Clawdbot internals: ${err}`);
-          ctx.log?.error(`[moltboard] Inbound messages will not be routed to agent.`);
+          // Try next path
         }
-      } else {
-        ctx.log?.error(`[moltboard] Could not find Clawdbot installation`);
-        ctx.log?.error(`[moltboard] Inbound messages will not be routed to agent.`);
+      }
+
+      if (!dispatchInboundMessageWithDispatcher) {
+        ctx.log?.error(`[moltboard] Could not load Clawdbot dispatch API`);
+        ctx.log?.error(`[moltboard] Tried paths: ${CLAWDBOT_PATHS.join(", ")}`);
+        ctx.log?.error(`[moltboard] Inbound messages will NOT be routed to agent.`);
       }
 
       ctx.log?.info(`[moltboard:${account.accountId}] Starting poller (interval=${account.pollIntervalMs}ms)...`);
@@ -300,9 +347,8 @@ export const moltboardPlugin: ChannelPlugin<ResolvedMoltboardAccount> = {
             
             // Skip already-processing messages (avoid re-processing on restart)
             if (msg.status === "processing") {
-              // Check if message is old (>5 min) - reset to allow retry
               const msgAge = Date.now() - new Date(msg.updatedAt || msg.createdAt).getTime();
-              if (msgAge < 5 * 60 * 1000) continue;
+              if (msgAge < 5 * 60 * 1000) continue; // Skip if < 5 min old
               ctx.log?.info(`[moltboard] Retrying stale message: ${msg.id}`);
             }
 
@@ -352,11 +398,9 @@ export const moltboardPlugin: ChannelPlugin<ResolvedMoltboardAccount> = {
               ? `Moltboard Context:\n${contextParts.join("\n\n")}`
               : undefined;
 
-            // Dispatch to agent using internal API
-            if (dispatchInboundMessageWithDispatcher && loadConfig && createReplyDispatcher) {
+            // Dispatch to agent
+            if (dispatchInboundMessageWithDispatcher && cfg) {
               try {
-                const cfg = loadConfig();
-                
                 // Build inbound context matching what built-in channels use
                 const inboundCtx = {
                   channel: "moltboard" as const,
@@ -371,7 +415,6 @@ export const moltboardPlugin: ChannelPlugin<ResolvedMoltboardAccount> = {
                   timestamp: new Date(msg.createdAt),
                   replyContext: msg.replyTo ? { id: msg.replyTo } : undefined,
                   envelope: systemHint,
-                  // Custom context for reply routing
                   moltboardContext: {
                     boardId,
                     taskId: msg.taskId,
@@ -382,39 +425,51 @@ export const moltboardPlugin: ChannelPlugin<ResolvedMoltboardAccount> = {
 
                 // Create reply function that sends back to Moltboard
                 const sendReply = async (text: string) => {
+                  ctx.log?.info(`[moltboard] sendReply called with ${text.length} chars`);
                   try {
-                    await sendMessage(account, {
+                    const result = await sendMessage(account, {
                       content: text,
                       boardId,
                       taskId: msg.taskId,
                       taskTitle: msg.taskTitle,
                       replyTo: msg.id,
                     });
+                    ctx.log?.info(`[moltboard] Sent reply: ${result.id}`);
                     
                     // Mark original as complete after successful reply
                     await updateMessageStatus(account, msg.id, "complete", { signal: abortSignal });
+                    ctx.setStatus({ lastOutboundAt: Date.now() });
                   } catch (err) {
                     ctx.log?.error(`[moltboard] Failed to send reply: ${err}`);
                   }
                 };
 
-                await dispatchInboundMessageWithDispatcher({
+                ctx.log?.info(`[moltboard] Calling dispatchInboundMessageWithDispatcher...`);
+                const dispatchResult = await dispatchInboundMessageWithDispatcher({
                   ctx: inboundCtx,
-                  cfg,
+                  cfg,  // Use ctx.cfg directly instead of loading config
                   dispatcherOptions: {
                     send: sendReply,
                     channel: "moltboard",
                   },
                 });
+                ctx.log?.info(`[moltboard] Dispatch returned: ${JSON.stringify(dispatchResult)?.slice(0, 200)}`);
 
                 ctx.setStatus({ lastInboundAt: Date.now() });
                 ctx.log?.info(`[moltboard] Dispatched message ${msg.id} to agent`);
               } catch (err) {
                 ctx.log?.error(`[moltboard] Failed to dispatch: ${err}`);
-                // Don't mark as complete - allow retry
+                // Reset to pending so it can be retried
+                try {
+                  await updateMessageStatus(account, msg.id, "pending" as any, { signal: abortSignal });
+                } catch {
+                  // Ignore
+                }
               }
             } else {
               ctx.log?.warn(`[moltboard] Dispatch API not available - message ${msg.id} not routed`);
+              // Mark as complete anyway to avoid infinite retry
+              await updateMessageStatus(account, msg.id, "complete", { signal: abortSignal });
             }
           }
 

@@ -304,7 +304,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 🔗 Links
 
-- **Website:** [moltboard.app](https://moltboard.app)
+- **Website:** [kanban.mlynn.org](https://kanban.mlynn.org)
 - **GitHub:** [github.com/mrlynn/moltboard](https://github.com/mrlynn/moltboard)
 - **OpenClaw:** [github.com/openclaw/openclaw](https://github.com/openclaw/openclaw)
 - **Documentation:** [docs/](docs/)
@@ -326,6 +326,6 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 **Transform Your Tasks with Moltboard**
 
-[Get Started](https://moltboard.app) · [Documentation](docs/) · [Report Bug](https://github.com/mrlynn/moltboard/issues)
+[Get Started](https://kanban.mlynn.org) · [Documentation](docs/) · [Report Bug](https://github.com/mrlynn/moltboard/issues)
 
 </div>

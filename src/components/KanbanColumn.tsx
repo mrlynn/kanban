@@ -31,6 +31,7 @@ interface KanbanColumnProps {
   collapsible?: boolean;
   defaultVisibleCount?: number;
   commentStats?: Record<string, { total: number; unreadMoltbot: number }>;
+  isMobile?: boolean;
 }
 
 const columnColors: Record<string, string> = {
@@ -55,6 +56,7 @@ export function KanbanColumn({
   collapsible = false,
   defaultVisibleCount = 10,
   commentStats = {},
+  isMobile = false,
 }: KanbanColumnProps) {
   const [expanded, setExpanded] = useState(false);
   const { setNodeRef, isOver } = useDroppable({
@@ -74,8 +76,10 @@ export function KanbanColumn({
     <Paper
       ref={setNodeRef}
       sx={{
-        width: 320,
-        minWidth: 320,
+        // Responsive width: full screen on mobile, fixed on desktop
+        width: isMobile ? 'calc(100vw - 32px)' : 320,
+        minWidth: isMobile ? 'calc(100vw - 32px)' : 320,
+        flexShrink: 0,
         maxHeight: '100%',
         display: 'flex',
         flexDirection: 'column',
@@ -83,6 +87,9 @@ export function KanbanColumn({
         border: '1px solid',
         borderColor: isOver ? 'primary.main' : alpha('#ffffff', 0.1),
         transition: 'border-color 0.2s',
+        // Mobile: snap to center
+        scrollSnapAlign: isMobile ? 'center' : 'none',
+        mx: isMobile ? 2 : 0,
       }}
     >
       {/* Column Header */}
@@ -206,6 +213,7 @@ export function KanbanColumn({
                 onArchive={onArchive}
                 commentCount={stats?.total || 0}
                 unreadMoltbotComments={stats?.unreadMoltbot || 0}
+                isMobile={isMobile}
               />
             );
           })}
