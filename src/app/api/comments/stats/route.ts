@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     // Get total comment counts per task
     const commentCounts = await db
       .collection<TaskComment>('comments')
-      .aggregate([
+      .aggregate<{ _id: string; total: number }>([
         { $match: matchStage },
         {
           $group: {
@@ -47,9 +47,9 @@ export async function GET(request: NextRequest) {
     let unreadCounts: Array<{ _id: string; count: number }> = [];
     if (since) {
       const sinceDate = new Date(since);
-      unreadCounts = await db
+      const unreadResults = await db
         .collection<TaskComment>('comments')
-        .aggregate([
+        .aggregate<{ _id: string; count: number }>([
           {
             $match: {
               ...matchStage,
@@ -65,6 +65,7 @@ export async function GET(request: NextRequest) {
           },
         ])
         .toArray();
+      unreadCounts = unreadResults;
     }
 
     // Build response map
