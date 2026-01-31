@@ -35,6 +35,7 @@ import {
   Delete,
   Archive,
   Logout,
+  Settings,
 } from '@mui/icons-material';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
@@ -388,6 +389,32 @@ export function Sidebar({ width }: SidebarProps) {
 
         {/* Spacer */}
         <Box sx={{ flex: 1 }} />
+
+        {/* Settings Link */}
+        <Box sx={{ px: 1, mb: 1 }}>
+          <ListItemButton
+            onClick={() => router.push('/settings')}
+            selected={pathname === '/settings'}
+            sx={{
+              borderRadius: 1,
+              '&.Mui-selected': {
+                bgcolor: alpha('#00ED64', 0.15),
+                '&:hover': { bgcolor: alpha('#00ED64', 0.2) },
+              },
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: 36 }}>
+              <Settings fontSize="small" sx={{ color: pathname === '/settings' ? 'primary.main' : 'text.secondary' }} />
+            </ListItemIcon>
+            <ListItemText
+              primary="Settings"
+              primaryTypographyProps={{
+                variant: 'body2',
+                fontWeight: pathname === '/settings' ? 600 : 400,
+              }}
+            />
+          </ListItemButton>
+        </Box>
 
         {/* User Profile & Logout */}
         {session?.user && (
