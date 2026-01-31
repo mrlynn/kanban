@@ -30,6 +30,7 @@ interface KanbanColumnProps {
   onBulkArchive?: (columnId: string) => void;
   collapsible?: boolean;
   defaultVisibleCount?: number;
+  commentStats?: Record<string, { total: number; unreadMoltbot: number }>;
 }
 
 const columnColors: Record<string, string> = {
@@ -53,6 +54,7 @@ export function KanbanColumn({
   onBulkArchive,
   collapsible = false,
   defaultVisibleCount = 10,
+  commentStats = {},
 }: KanbanColumnProps) {
   const [expanded, setExpanded] = useState(false);
   const { setNodeRef, isOver } = useDroppable({
@@ -192,16 +194,21 @@ export function KanbanColumn({
           items={visibleTasks.map((t) => t.id)}
           strategy={verticalListSortingStrategy}
         >
-          {visibleTasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              onEdit={onEditTask}
-              onDelete={onDeleteTask}
-              onOpenDetails={onOpenDetails}
-              onArchive={onArchive}
-            />
-          ))}
+          {visibleTasks.map((task) => {
+            const stats = commentStats[task.id];
+            return (
+              <TaskCard
+                key={task.id}
+                task={task}
+                onEdit={onEditTask}
+                onDelete={onDeleteTask}
+                onOpenDetails={onOpenDetails}
+                onArchive={onArchive}
+                commentCount={stats?.total || 0}
+                unreadMoltbotComments={stats?.unreadMoltbot || 0}
+              />
+            );
+          })}
         </SortableContext>
         
         {tasks.length === 0 && (

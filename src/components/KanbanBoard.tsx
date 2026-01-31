@@ -212,10 +212,20 @@ export function KanbanBoard({ boardId }: KanbanBoardProps) {
     }
   };
 
-  // Open task details
+  // Open task details - also marks comments as "seen"
   const handleOpenDetails = (task: Task) => {
     setSelectedTask(task);
     setDetailDialogOpen(true);
+    // Mark comments as seen by updating localStorage timestamp
+    setLastSeenTime();
+    // Clear unread count for this task
+    setCommentStats(prev => {
+      const updated = { ...prev };
+      if (updated[task.id]) {
+        updated[task.id] = { ...updated[task.id], unreadMoltbot: 0 };
+      }
+      return updated;
+    });
   };
 
   // Archive task handler
@@ -391,6 +401,7 @@ export function KanbanBoard({ boardId }: KanbanBoardProps) {
                 onBulkArchive={isDoneColumn ? handleBulkArchive : undefined}
                 collapsible={isDoneColumn}
                 defaultVisibleCount={10}
+                commentStats={commentStats}
               />
             );
           })}
