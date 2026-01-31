@@ -7,7 +7,27 @@
  * These are stable (used by all built-in channels) but not officially exported.
  */
 
+import { createRequire } from "module";
 import type { ChannelPlugin, ChannelAccountSnapshot, ClawdbotConfig } from "clawdbot/plugin-sdk";
+
+// Helper to resolve Clawdbot internals from the global installation
+function getClawdbotRequire(): NodeRequire | null {
+  // Try common installation paths
+  const paths = [
+    "/opt/homebrew/lib/node_modules/clawdbot/package.json",
+    "/usr/local/lib/node_modules/clawdbot/package.json",
+    "/usr/lib/node_modules/clawdbot/package.json",
+  ];
+  
+  for (const p of paths) {
+    try {
+      return createRequire(p);
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
 import type { ResolvedMoltboardAccount, MoltboardChannelConfig } from "./types.js";
 import { 
   fetchPendingMessages, 
@@ -225,25 +245,32 @@ export const moltboardPlugin: ChannelPlugin<ResolvedMoltboardAccount> = {
         return () => {};
       }
 
-      // Lazy-load internal Clawdbot dispatch API
-      // This is the same approach used by built-in channels
+      // Load internal Clawdbot dispatch API using createRequire
+      // This resolves modules from Clawdbot's installation path
       let dispatchInboundMessageWithDispatcher: any;
       let loadConfig: any;
       let createReplyDispatcher: any;
       
-      try {
-        const dispatchModule = await import("clawdbot/dist/auto-reply/dispatch.js");
-        dispatchInboundMessageWithDispatcher = dispatchModule.dispatchInboundMessageWithDispatcher;
-        
-        const configModule = await import("clawdbot/dist/config/config.js");
-        loadConfig = configModule.loadConfig;
-        
-        const replyModule = await import("clawdbot/dist/auto-reply/reply/reply-dispatcher.js");
-        createReplyDispatcher = replyModule.createReplyDispatcher;
-      } catch (err) {
-        ctx.log?.error(`[moltboard] Failed to load Clawdbot internals: ${err}`);
+      const clawdbotRequire = getClawdbotRequire();
+      if (clawdbotRequire) {
+        try {
+          const dispatchModule = clawdbotRequire("./dist/auto-reply/dispatch.js");
+          dispatchInboundMessageWithDispatcher = dispatchModule.dispatchInboundMessageWithDispatcher;
+          
+          const configModule = clawdbotRequire("./dist/config/config.js");
+          loadConfig = configModule.loadConfig;
+          
+          const replyModule = clawdbotRequire("./dist/auto-reply/reply/reply-dispatcher.js");
+          createReplyDispatcher = replyModule.createReplyDispatcher;
+          
+          ctx.log?.info(`[moltboard] Loaded Clawdbot dispatch API successfully`);
+        } catch (err) {
+          ctx.log?.error(`[moltboard] Failed to load Clawdbot internals: ${err}`);
+          ctx.log?.error(`[moltboard] Inbound messages will not be routed to agent.`);
+        }
+      } else {
+        ctx.log?.error(`[moltboard] Could not find Clawdbot installation`);
         ctx.log?.error(`[moltboard] Inbound messages will not be routed to agent.`);
-        // Continue anyway - outbound still works
       }
 
       ctx.log?.info(`[moltboard:${account.accountId}] Starting poller (interval=${account.pollIntervalMs}ms)...`);

@@ -34,8 +34,10 @@ import {
   PriorityHigh,
   Delete,
   Archive,
+  Logout,
 } from '@mui/icons-material';
 import { useRouter, usePathname } from 'next/navigation';
+import { useSession, signOut } from 'next-auth/react';
 import { Board, Actor } from '@/types/kanban';
 
 interface SidebarProps {
@@ -105,6 +107,7 @@ function ActionIcon({ action }: { action: string }) {
 
 export function Sidebar({ width }: SidebarProps) {
   const router = useRouter();
+  const { data: session } = useSession();
   const pathname = usePathname();
   
   // Board state
@@ -386,6 +389,70 @@ export function Sidebar({ width }: SidebarProps) {
         {/* Spacer */}
         <Box sx={{ flex: 1 }} />
 
+        {/* User Profile & Logout */}
+        {session?.user && (
+          <Box
+            sx={{
+              px: 2,
+              py: 1.5,
+              borderTop: '1px solid',
+              borderColor: alpha('#ffffff', 0.1),
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+            }}
+          >
+            <Avatar
+              src={session.user.image || undefined}
+              sx={{
+                width: 32,
+                height: 32,
+                bgcolor: '#3B82F6',
+                fontSize: '0.875rem',
+              }}
+            >
+              {session.user.name?.[0]?.toUpperCase() || 'U'}
+            </Avatar>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 500,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {session.user.name || 'User'}
+              </Typography>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{
+                  display: 'block',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {session.user.email}
+              </Typography>
+            </Box>
+            <Tooltip title="Sign out">
+              <IconButton
+                size="small"
+                onClick={() => signOut({ callbackUrl: '/auth/signin' })}
+                sx={{
+                  color: 'text.secondary',
+                  '&:hover': { color: 'error.main' },
+                }}
+              >
+                <Logout fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        )}
+
         {/* Footer Links */}
         <Box
           sx={{
@@ -394,7 +461,7 @@ export function Sidebar({ width }: SidebarProps) {
             display: 'flex',
             gap: 2,
             justifyContent: 'center',
-            borderTop: '1px solid',
+            borderTop: session?.user ? 'none' : '1px solid',
             borderColor: alpha('#ffffff', 0.1),
             pt: 1.5,
           }}
