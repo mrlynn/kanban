@@ -1,10 +1,11 @@
 import NextAuth from 'next-auth';
+import type { Provider } from 'next-auth/providers/index';
 import GitHubProvider from 'next-auth/providers/github';
 import CredentialsProvider from 'next-auth/providers/credentials';
 
 const isDev = process.env.NODE_ENV === 'development';
 
-const providers = [
+const providers: Provider[] = [
   GitHubProvider({
     clientId: process.env.GITHUB_CLIENT_ID!,
     clientSecret: process.env.GITHUB_CLIENT_SECRET!,
