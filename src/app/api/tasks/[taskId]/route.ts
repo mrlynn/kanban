@@ -153,6 +153,21 @@ export async function PATCH(
       }
     }
     
+    // Track assignee change
+    if (updates.assigneeId !== undefined && updates.assigneeId !== currentTask.assigneeId) {
+      await logActivity({
+        taskId,
+        boardId,
+        action: 'updated',
+        actor,
+        details: {
+          field: 'assignee',
+          from: currentTask.assigneeId || 'unassigned',
+          to: updates.assigneeId || 'unassigned',
+        },
+      });
+    }
+    
     // Track general updates (title, description, labels, dueDate)
     const trackedFields = ['title', 'description', 'labels', 'dueDate'];
     const changedFields = trackedFields.filter(

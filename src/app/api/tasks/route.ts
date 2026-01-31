@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { title, description, columnId, boardId, labels, dueDate, priority } = await request.json();
+    const { title, description, columnId, boardId, labels, dueDate, priority, assigneeId } = await request.json();
     
     if (!title || !columnId || !boardId) {
       return NextResponse.json(
@@ -166,6 +166,7 @@ export async function POST(request: NextRequest) {
       labels: labels || [],
       priority: priority || undefined,
       dueDate: dueDate ? new Date(dueDate) : undefined,
+      assigneeId: assigneeId || undefined,
       createdAt: new Date(),
       updatedAt: new Date(),
       createdBy: actor,
