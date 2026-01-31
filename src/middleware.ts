@@ -23,6 +23,6 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     // Protect all routes except auth and public assets
-    '/((?!api/auth|auth|_next/static|_next/image|favicon.ico).*)',
+    '/((?!api/auth|auth|_next/static|_next/image|favicon.ico|.*\\.png|.*\\.jpg|.*\\.jpeg|.*\\.svg|.*\\.ico|.*\\.webp).*)',
   ],
 };
