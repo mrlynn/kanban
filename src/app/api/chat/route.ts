@@ -114,6 +114,26 @@ export async function POST(request: NextRequest) {
     };
     
     await db.collection<ChatMessage>('chats').insertOne(message);
+
+    // Check for task creation intent from user messages
+    if (actor === 'mike') {
+      try {
+        const { handleChatMessage } = await import('@/lib/moltbot/features/task-creator');
+        const result = await handleChatMessage(
+          message.id,
+          content.trim(),
+          boardId || 'general',
+          actor
+        );
+        
+        if (result.taskCreated) {
+          console.log(`[chat] Task created from message ${message.id}`);
+        }
+      } catch (error) {
+        // Don't fail the message if task detection fails
+        console.error('[chat] Task detection error:', error);
+      }
+    }
     
     return NextResponse.json(message, { status: 201 });
   } catch (error) {

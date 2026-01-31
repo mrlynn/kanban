@@ -69,11 +69,11 @@ export async function getBoardActivities(boardId: string, limit = 100): Promise<
 /**
  * Detect actor from request headers
  */
-export function detectActor(apiKey?: string | null): Actor {
-  // If authenticated via API key, check if it's Moltbot
-  if (apiKey) {
-    return 'moltbot';
+export function detectActor(apiKey?: string | null, forcedActor?: string): Actor {
+  // Allow forcing actor for testing/flexibility
+  if (forcedActor && ['mike', 'moltbot', 'system', 'api'].includes(forcedActor)) {
+    return forcedActor as Actor;
   }
-  // Session auth = Mike
+  // Session auth or API key without explicit actor = Mike (owner)
   return 'mike';
 }
