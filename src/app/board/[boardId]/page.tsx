@@ -9,6 +9,7 @@ import {
 import { ArrowBack } from '@mui/icons-material';
 import Link from 'next/link';
 import { KanbanBoard } from '@/components/KanbanBoard';
+import { ChatSidebar } from '@/components/ChatSidebar';
 
 interface BoardPageProps {
   params: { boardId: string };
@@ -58,6 +59,9 @@ export default function BoardPage({ params }: BoardPageProps) {
       >
         <KanbanBoard boardId={boardId} />
       </Container>
+
+      {/* Chat with Moltbot */}
+      <ChatSidebar boardId={boardId} />
     </Box>
   );
 }
