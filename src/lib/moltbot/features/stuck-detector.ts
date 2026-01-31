@@ -44,8 +44,10 @@ export async function detectAndAlertStuckTasks(): Promise<StuckDetectionResult> 
       const analysis = await agent.analyzeBoardState();
       tasksChecked += analysis.totalTasks;
 
-      // Filter to only very stuck tasks (5+ days)
-      const veryStuck = analysis.stuckTasks.filter((s) => s.daysStuck >= 5);
+      // Filter to stuck tasks (configurable threshold)
+      // Production: 5+ days, Testing: 1+ days
+      const STUCK_THRESHOLD_DAYS = process.env.NODE_ENV === 'development' ? 1 : 5;
+      const veryStuck = analysis.stuckTasks.filter((s) => s.daysStuck >= STUCK_THRESHOLD_DAYS);
       stuckFound += veryStuck.length;
 
       // Send individual alerts for very stuck tasks

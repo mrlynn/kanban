@@ -171,7 +171,9 @@ export class MoltbotAgent {
     activities: Activity[]
   ): Promise<StuckTask[]> {
     const stuckTasks: StuckTask[] = [];
-    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+    // Lower threshold in dev for testing
+    const stuckThresholdDays = process.env.NODE_ENV === 'development' ? 1 : 3;
+    const thresholdDate = new Date(Date.now() - stuckThresholdDays * 24 * 60 * 60 * 1000);
 
     // In-progress column IDs
     const inProgressColumns = ['in-progress', 'col_6650cbcc8b7e6e2b'];
@@ -194,7 +196,7 @@ export class MoltbotAgent {
         : undefined;
 
       // Check if stuck
-      if (!lastActivityAt || lastActivityAt < threeDaysAgo) {
+      if (!lastActivityAt || lastActivityAt < thresholdDate) {
         const daysStuck = lastActivityAt
           ? Math.floor(
               (Date.now() - lastActivityAt.getTime()) / (1000 * 60 * 60 * 24)
