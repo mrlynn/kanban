@@ -20,6 +20,7 @@ import {
   Comment,
   Archive,
   Unarchive,
+  LocalFireDepartment,
 } from '@mui/icons-material';
 import { Task, PriorityConfig } from '@/types/kanban';
 
@@ -31,6 +32,7 @@ interface TaskCardProps {
   onArchive?: (taskId: string) => void;
   onRestore?: (taskId: string) => void;
   commentCount?: number;
+  unreadMoltbotComments?: number;
   showArchiveButton?: boolean;
 }
 
@@ -60,6 +62,7 @@ export function TaskCard({
   onArchive,
   onRestore,
   commentCount = 0,
+  unreadMoltbotComments = 0,
   showArchiveButton = true,
 }: TaskCardProps) {
   const {
@@ -198,17 +201,34 @@ export function TaskCard({
               )}
               
               {commentCount > 0 && (
-                <Box
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 0.5,
-                    color: 'text.secondary',
-                  }}
-                >
-                  <Comment sx={{ fontSize: 14 }} />
-                  <Typography variant="caption">{commentCount}</Typography>
-                </Box>
+                <Tooltip title={unreadMoltbotComments > 0 ? `${unreadMoltbotComments} new from Moltbot` : `${commentCount} comments`}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 0.5,
+                      color: unreadMoltbotComments > 0 ? '#F97316' : 'text.secondary',
+                      bgcolor: unreadMoltbotComments > 0 ? alpha('#F97316', 0.15) : 'transparent',
+                      px: unreadMoltbotComments > 0 ? 0.75 : 0,
+                      py: unreadMoltbotComments > 0 ? 0.25 : 0,
+                      borderRadius: 1,
+                      animation: unreadMoltbotComments > 0 ? 'pulse 2s infinite' : 'none',
+                      '@keyframes pulse': {
+                        '0%, 100%': { opacity: 1 },
+                        '50%': { opacity: 0.6 },
+                      },
+                    }}
+                  >
+                    {unreadMoltbotComments > 0 ? (
+                      <LocalFireDepartment sx={{ fontSize: 14 }} />
+                    ) : (
+                      <Comment sx={{ fontSize: 14 }} />
+                    )}
+                    <Typography variant="caption" fontWeight={unreadMoltbotComments > 0 ? 600 : 400}>
+                      {unreadMoltbotComments > 0 ? unreadMoltbotComments : commentCount}
+                    </Typography>
+                  </Box>
+                </Tooltip>
               )}
             </Box>
           </Box>

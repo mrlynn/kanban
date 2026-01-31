@@ -33,12 +33,26 @@ interface KanbanBoardProps {
   boardId: string;
 }
 
+// Get last seen timestamp from localStorage
+const getLastSeenTime = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('kanban_last_seen_comments');
+};
+
+const setLastSeenTime = () => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('kanban_last_seen_comments', new Date().toISOString());
+};
+
 export function KanbanBoard({ boardId }: KanbanBoardProps) {
   const [board, setBoard] = useState<Board | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
+  
+  // Comment stats for notifications
+  const [commentStats, setCommentStats] = useState<Record<string, { total: number; unreadMoltbot: number }>>({});
   
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -73,6 +87,26 @@ export function KanbanBoard({ boardId }: KanbanBoardProps) {
     }, {} as Record<string, string>);
   }, [board]);
 
+  // Fetch comment stats
+  const fetchCommentStats = useCallback(async () => {
+    try {
+      const lastSeen = getLastSeenTime();
+      const url = new URL('/api/comments/stats', window.location.origin);
+      url.searchParams.set('boardId', boardId);
+      if (lastSeen) {
+        url.searchParams.set('since', lastSeen);
+      }
+      
+      const res = await fetch(url.toString());
+      if (res.ok) {
+        const data = await res.json();
+        setCommentStats(data.stats || {});
+      }
+    } catch (err) {
+      console.error('Failed to fetch comment stats:', err);
+    }
+  }, [boardId]);
+
   // Fetch board and tasks
   const fetchData = useCallback(async () => {
     try {
@@ -99,13 +133,16 @@ export function KanbanBoard({ boardId }: KanbanBoardProps) {
         setArchivedCount(archiveData.count || 0);
       }
       
+      // Fetch comment stats for notification badges
+      await fetchCommentStats();
+      
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
     }
-  }, [boardId]);
+  }, [boardId, fetchCommentStats]);
 
   useEffect(() => {
     fetchData();
