@@ -154,9 +154,18 @@ export default function SettingsPage() {
       
       if (res.ok) {
         const data = await res.json();
-        setNewKeyValue(data.rawKey);
+        // API returns { key: { id, name, key, keyPrefix, scopes, ... } }
+        setNewKeyValue(data.key.key);  // The raw key value
         setShowNewKey(true);
-        setApiKeys(prev => [data.apiKey, ...prev]);
+        // Add to list with the structure our UI expects
+        setApiKeys(prev => [{
+          id: data.key.id,
+          name: data.key.name,
+          keyPrefix: data.key.keyPrefix,
+          scopes: data.key.scopes,
+          createdAt: data.key.createdAt,
+          usageCount: 0,
+        }, ...prev]);
         setCreateDialogOpen(false);
         setNewKeyName('');
         setNewKeyScopes(DEFAULT_SCOPES);
