@@ -57,6 +57,7 @@ export const USERS: User[] = [
 export interface Task {
   _id?: ObjectId;
   id: string;
+  tenantId: string;           // Multi-tenant isolation
   title: string;
   description?: string;
   columnId: string;
@@ -88,6 +89,7 @@ export interface Column {
 export interface Board {
   _id?: ObjectId;
   id: string;
+  tenantId: string;           // Multi-tenant isolation
   name: string;
   description?: string;
   columns: Column[];
@@ -118,6 +120,7 @@ export type ActivityAction =
 export interface TaskActivity {
   _id?: ObjectId;
   id: string;
+  tenantId: string;           // Multi-tenant isolation
   taskId: string;
   boardId: string;
   action: ActivityAction;
@@ -135,6 +138,7 @@ export interface TaskActivity {
 export interface TaskComment {
   _id?: ObjectId;
   id: string;
+  tenantId: string;           // Multi-tenant isolation
   taskId: string;
   boardId: string;
   author: Actor;

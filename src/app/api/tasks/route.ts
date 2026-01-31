@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
 import { Task } from '@/types/kanban';
-import { isAuthenticated, unauthorizedResponse } from '@/lib/auth';
+import { requireScope, AuthError } from '@/lib/tenant-auth';
 import { logActivity, detectActor } from '@/lib/activity';
 import crypto from 'crypto';
 
@@ -11,11 +11,9 @@ function generateId(prefix: string): string {
 
 // GET tasks (optionally filtered by boardId)
 export async function GET(request: NextRequest) {
-  if (!(await isAuthenticated(request))) {
-    return unauthorizedResponse();
-  }
-
   try {
+    const context = await requireScope(request, 'tasks:read');
+    
     const { searchParams } = new URL(request.url);
     const boardId = searchParams.get('boardId');
     const includeArchived = searchParams.get('includeArchived') === 'true';
@@ -33,8 +31,8 @@ export async function GET(request: NextRequest) {
     
     const db = await getDb();
     
-    // Build query
-    const query: Record<string, unknown> = {};
+    // Build query - always filter by tenant
+    const query: Record<string, unknown> = { tenantId: context.tenantId };
     if (boardId) query.boardId = boardId;
     
     // Text search (title and description)
@@ -122,6 +120,9 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json(tasks);
   } catch (error) {
+    if (error instanceof AuthError) {
+      return Response.json({ error: error.message }, { status: error.status });
+    }
     console.error('Error fetching tasks:', error);
     return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 });
   }
@@ -129,11 +130,9 @@ export async function GET(request: NextRequest) {
 
 // POST create new task
 export async function POST(request: NextRequest) {
-  if (!(await isAuthenticated(request))) {
-    return unauthorizedResponse();
-  }
-
   try {
+    const context = await requireScope(request, 'tasks:write');
+    
     const { title, description, columnId, boardId, labels, dueDate, priority, assigneeId } = await request.json();
     
     if (!title || !columnId || !boardId) {
@@ -145,19 +144,31 @@ export async function POST(request: NextRequest) {
     
     const db = await getDb();
     
+    // Verify board belongs to tenant
+    const board = await db.collection('boards').findOne({ 
+      id: boardId, 
+      tenantId: context.tenantId 
+    });
+    if (!board) {
+      return NextResponse.json({ error: 'Board not found' }, { status: 404 });
+    }
+    
     // Detect actor
-    const apiKey = request.headers.get('x-api-key');
-    const actor = detectActor(apiKey);
+    const actor = context.type === 'apiKey' ? 'api' : 'mike';
     
     // Get the highest order in this column
     const lastTask = await db
       .collection<Task>('tasks')
-      .findOne({ columnId }, { sort: { order: -1 } });
+      .findOne(
+        { tenantId: context.tenantId, columnId }, 
+        { sort: { order: -1 } }
+      );
     
     const order = lastTask ? lastTask.order + 1 : 0;
     
     const task: Task = {
       id: generateId('task'),
+      tenantId: context.tenantId,
       title,
       description,
       columnId,
@@ -174,8 +185,15 @@ export async function POST(request: NextRequest) {
     
     await db.collection<Task>('tasks').insertOne(task);
     
+    // Update tenant usage
+    await db.collection('tenants').updateOne(
+      { id: context.tenantId },
+      { $inc: { 'usage.tasks': 1 } }
+    );
+    
     // Log activity
     await logActivity({
+      tenantId: context.tenantId,
       taskId: task.id,
       boardId,
       action: 'created',
@@ -187,6 +205,9 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json(task, { status: 201 });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return Response.json({ error: error.message }, { status: error.status });
+    }
     console.error('Error creating task:', error);
     return NextResponse.json({ error: 'Failed to create task' }, { status: 500 });
   }

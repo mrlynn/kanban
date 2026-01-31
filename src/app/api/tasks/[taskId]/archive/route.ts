@@ -1,28 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
 import { Task } from '@/types/kanban';
-import { isAuthenticated, unauthorizedResponse } from '@/lib/auth';
-import { logActivity, detectActor } from '@/lib/activity';
+import { requireScope, AuthError } from '@/lib/tenant-auth';
+import { logActivity } from '@/lib/activity';
 
 // POST archive a task
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
-  if (!(await isAuthenticated(request))) {
-    return unauthorizedResponse();
-  }
-
   try {
+    const context = await requireScope(request, 'tasks:write');
     const { taskId } = await params;
     const db = await getDb();
     
     // Detect actor
-    const apiKey = request.headers.get('x-api-key');
-    const actor = detectActor(apiKey);
+    const actor = context.type === 'apiKey' ? 'api' : 'mike';
     
-    // Get current task
-    const task = await db.collection<Task>('tasks').findOne({ id: taskId });
+    // Get current task - verify tenant
+    const task = await db.collection<Task>('tasks').findOne({ 
+      id: taskId,
+      tenantId: context.tenantId 
+    });
     if (!task) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
@@ -33,7 +32,7 @@ export async function POST(
     
     // Archive the task
     const result = await db.collection<Task>('tasks').findOneAndUpdate(
-      { id: taskId },
+      { id: taskId, tenantId: context.tenantId },
       {
         $set: {
           archived: true,
@@ -51,6 +50,7 @@ export async function POST(
     
     // Log activity
     await logActivity({
+      tenantId: context.tenantId,
       taskId,
       boardId: task.boardId,
       action: 'archived',
@@ -62,6 +62,9 @@ export async function POST(
     
     return NextResponse.json(result);
   } catch (error) {
+    if (error instanceof AuthError) {
+      return Response.json({ error: error.message }, { status: error.status });
+    }
     console.error('Error archiving task:', error);
     return NextResponse.json({ error: 'Failed to archive task' }, { status: 500 });
   }
@@ -72,20 +75,19 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
-  if (!(await isAuthenticated(request))) {
-    return unauthorizedResponse();
-  }
-
   try {
+    const context = await requireScope(request, 'tasks:write');
     const { taskId } = await params;
     const db = await getDb();
     
     // Detect actor
-    const apiKey = request.headers.get('x-api-key');
-    const actor = detectActor(apiKey);
+    const actor = context.type === 'apiKey' ? 'api' : 'mike';
     
-    // Get current task
-    const task = await db.collection<Task>('tasks').findOne({ id: taskId });
+    // Get current task - verify tenant
+    const task = await db.collection<Task>('tasks').findOne({ 
+      id: taskId,
+      tenantId: context.tenantId 
+    });
     if (!task) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
@@ -96,7 +98,7 @@ export async function DELETE(
     
     // Restore the task
     const result = await db.collection<Task>('tasks').findOneAndUpdate(
-      { id: taskId },
+      { id: taskId, tenantId: context.tenantId },
       {
         $set: {
           archived: false,
@@ -116,6 +118,7 @@ export async function DELETE(
     
     // Log activity
     await logActivity({
+      tenantId: context.tenantId,
       taskId,
       boardId: task.boardId,
       action: 'restored',
@@ -127,6 +130,9 @@ export async function DELETE(
     
     return NextResponse.json(result);
   } catch (error) {
+    if (error instanceof AuthError) {
+      return Response.json({ error: error.message }, { status: error.status });
+    }
     console.error('Error restoring task:', error);
     return NextResponse.json({ error: 'Failed to restore task' }, { status: 500 });
   }

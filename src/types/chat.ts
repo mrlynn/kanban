@@ -4,7 +4,8 @@ import { Actor } from './kanban';
 export interface ChatMessage {
   _id?: ObjectId;
   id: string;
-  boardId: string;
+  tenantId: string;           // Multi-tenant isolation
+  boardId?: string;           // Optional - global chat has no boardId
   author: Actor;
   content: string;
   // Optional context - if message relates to a specific task
@@ -21,7 +22,8 @@ export interface ChatMessage {
 export interface ChatSession {
   _id?: ObjectId;
   id: string;
-  boardId: string;
+  tenantId: string;           // Multi-tenant isolation
+  boardId?: string;           // Optional - global chat has no boardId
   lastMessageAt: Date;
   messageCount: number;
   createdAt: Date;

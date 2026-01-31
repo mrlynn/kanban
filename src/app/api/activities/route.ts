@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
 import { TaskActivity, TaskComment, Task } from '@/types/kanban';
-import { isAuthenticated, unauthorizedResponse } from '@/lib/auth';
+import { requireScope, AuthError } from '@/lib/tenant-auth';
 
 /**
  * Global Activity Feed
  * 
- * GET /api/activities - Fetch recent activities across all boards
+ * GET /api/activities - Fetch recent activities across all boards for tenant
  * 
  * Query params:
  *   - since: ISO timestamp to fetch activities after (for polling)
@@ -15,11 +15,9 @@ import { isAuthenticated, unauthorizedResponse } from '@/lib/auth';
  *   - includeComments: Include comments in feed (default true)
  */
 export async function GET(request: NextRequest) {
-  if (!(await isAuthenticated(request))) {
-    return unauthorizedResponse();
-  }
-
   try {
+    const context = await requireScope(request, 'tasks:read');
+    
     const { searchParams } = new URL(request.url);
     const since = searchParams.get('since');
     const limit = parseInt(searchParams.get('limit') || '50', 10);
@@ -28,9 +26,9 @@ export async function GET(request: NextRequest) {
 
     const db = await getDb();
     
-    // Build query
-    const activityQuery: Record<string, unknown> = {};
-    const commentQuery: Record<string, unknown> = {};
+    // Build query - always filter by tenant
+    const activityQuery: Record<string, unknown> = { tenantId: context.tenantId };
+    const commentQuery: Record<string, unknown> = { tenantId: context.tenantId };
     
     if (since) {
       const sinceDate = new Date(since);
@@ -70,7 +68,7 @@ export async function GET(request: NextRequest) {
     
     const tasks = await db
       .collection<Task>('tasks')
-      .find({ id: { $in: taskIds } })
+      .find({ tenantId: context.tenantId, id: { $in: taskIds } })
       .project<{ id: string; title: string }>({ id: 1, title: 1 })
       .toArray();
     
@@ -116,6 +114,9 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return Response.json({ error: error.message }, { status: error.status });
+    }
     console.error('Error fetching global activities:', error);
     return NextResponse.json(
       { error: 'Failed to fetch activities' },

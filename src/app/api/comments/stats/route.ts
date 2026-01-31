@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
 import { TaskComment } from '@/types/kanban';
-import { isAuthenticated, unauthorizedResponse } from '@/lib/auth';
+import { requireScope, AuthError } from '@/lib/tenant-auth';
 
 /**
  * Comment Stats API
@@ -13,18 +13,17 @@ import { isAuthenticated, unauthorizedResponse } from '@/lib/auth';
  */
 
 export async function GET(request: NextRequest) {
-  if (!(await isAuthenticated(request))) {
-    return unauthorizedResponse();
-  }
-
   try {
+    const context = await requireScope(request, 'tasks:read');
+    
     const { searchParams } = new URL(request.url);
     const boardId = searchParams.get('boardId');
     const since = searchParams.get('since');
 
     const db = await getDb();
     
-    const matchStage: Record<string, unknown> = {};
+    // Always filter by tenant
+    const matchStage: Record<string, unknown> = { tenantId: context.tenantId };
     if (boardId) {
       matchStage.boardId = boardId;
     }
@@ -85,6 +84,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ stats });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return Response.json({ error: error.message }, { status: error.status });
+    }
     console.error('Error fetching comment stats:', error);
     return NextResponse.json(
       { error: 'Failed to fetch comment stats' },

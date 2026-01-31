@@ -1,23 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
 import { Task } from '@/types/kanban';
-import { isAuthenticated, unauthorizedResponse } from '@/lib/auth';
-import { logActivity, detectActor } from '@/lib/activity';
+import { requireScope, AuthError } from '@/lib/tenant-auth';
+import { logActivity } from '@/lib/activity';
 
 // GET single task
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
-  if (!(await isAuthenticated(request))) {
-    return unauthorizedResponse();
-  }
-
   try {
+    const context = await requireScope(request, 'tasks:read');
     const { taskId } = await params;
     const db = await getDb();
     
-    const task = await db.collection<Task>('tasks').findOne({ id: taskId });
+    const task = await db.collection<Task>('tasks').findOne({ 
+      id: taskId,
+      tenantId: context.tenantId 
+    });
     
     if (!task) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
@@ -25,6 +25,9 @@ export async function GET(
     
     return NextResponse.json(task);
   } catch (error) {
+    if (error instanceof AuthError) {
+      return Response.json({ error: error.message }, { status: error.status });
+    }
     console.error('Error fetching task:', error);
     return NextResponse.json({ error: 'Failed to fetch task' }, { status: 500 });
   }
@@ -35,24 +38,26 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
-  if (!(await isAuthenticated(request))) {
-    return unauthorizedResponse();
-  }
-
   try {
+    const context = await requireScope(request, 'tasks:write');
     const { taskId } = await params;
     const updates = await request.json();
     const db = await getDb();
     
     // Detect actor
-    const apiKey = request.headers.get('x-api-key');
-    const actor = detectActor(apiKey);
+    const actor = context.type === 'apiKey' ? 'api' : 'mike';
     
     // Get current task state for comparison
-    const currentTask = await db.collection<Task>('tasks').findOne({ id: taskId });
+    const currentTask = await db.collection<Task>('tasks').findOne({ 
+      id: taskId,
+      tenantId: context.tenantId 
+    });
     if (!currentTask) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
+    
+    // Don't allow updating tenantId
+    delete updates.tenantId;
     
     // Handle date conversion
     if (updates.dueDate) {
@@ -60,7 +65,7 @@ export async function PATCH(
     }
     
     const result = await db.collection<Task>('tasks').findOneAndUpdate(
-      { id: taskId },
+      { id: taskId, tenantId: context.tenantId },
       { 
         $set: { 
           ...updates,
@@ -80,6 +85,7 @@ export async function PATCH(
     // Track column move
     if (updates.columnId && updates.columnId !== currentTask.columnId) {
       await logActivity({
+        tenantId: context.tenantId,
         taskId,
         boardId,
         action: 'moved',
@@ -94,6 +100,7 @@ export async function PATCH(
     // Track priority change
     if (updates.priority !== undefined && updates.priority !== currentTask.priority) {
       await logActivity({
+        tenantId: context.tenantId,
         taskId,
         boardId,
         action: 'priority_changed',
@@ -141,6 +148,7 @@ export async function PATCH(
       
       if (checklistNote) {
         await logActivity({
+          tenantId: context.tenantId,
           taskId,
           boardId,
           action: 'updated',
@@ -156,6 +164,7 @@ export async function PATCH(
     // Track assignee change
     if (updates.assigneeId !== undefined && updates.assigneeId !== currentTask.assigneeId) {
       await logActivity({
+        tenantId: context.tenantId,
         taskId,
         boardId,
         action: 'updated',
@@ -177,6 +186,7 @@ export async function PATCH(
     
     if (changedFields.length > 0 && !updates.columnId) {
       await logActivity({
+        tenantId: context.tenantId,
         taskId,
         boardId,
         action: 'updated',
@@ -189,6 +199,9 @@ export async function PATCH(
     
     return NextResponse.json(result);
   } catch (error) {
+    if (error instanceof AuthError) {
+      return Response.json({ error: error.message }, { status: error.status });
+    }
     console.error('Error updating task:', error);
     return NextResponse.json({ error: 'Failed to update task' }, { status: 500 });
   }
@@ -199,42 +212,56 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
-  if (!(await isAuthenticated(request))) {
-    return unauthorizedResponse();
-  }
-
   try {
+    const context = await requireScope(request, 'tasks:write');
     const { taskId } = await params;
     const db = await getDb();
     
     // Detect actor
-    const apiKey = request.headers.get('x-api-key');
-    const actor = detectActor(apiKey);
+    const actor = context.type === 'apiKey' ? 'api' : 'mike';
     
     // Get task for logging
-    const task = await db.collection<Task>('tasks').findOne({ id: taskId });
+    const task = await db.collection<Task>('tasks').findOne({ 
+      id: taskId,
+      tenantId: context.tenantId 
+    });
     
-    const result = await db.collection<Task>('tasks').deleteOne({ id: taskId });
+    if (!task) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    }
+    
+    const result = await db.collection<Task>('tasks').deleteOne({ 
+      id: taskId,
+      tenantId: context.tenantId 
+    });
     
     if (result.deletedCount === 0) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
     
+    // Update tenant usage
+    await db.collection('tenants').updateOne(
+      { id: context.tenantId },
+      { $inc: { 'usage.tasks': -1 } }
+    );
+    
     // Log deletion
-    if (task) {
-      await logActivity({
-        taskId,
-        boardId: task.boardId,
-        action: 'deleted',
-        actor,
-        details: {
-          note: task.title,
-        },
-      });
-    }
+    await logActivity({
+      tenantId: context.tenantId,
+      taskId,
+      boardId: task.boardId,
+      action: 'deleted',
+      actor,
+      details: {
+        note: task.title,
+      },
+    });
     
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return Response.json({ error: error.message }, { status: error.status });
+    }
     console.error('Error deleting task:', error);
     return NextResponse.json({ error: 'Failed to delete task' }, { status: 500 });
   }

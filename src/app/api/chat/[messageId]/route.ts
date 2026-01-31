@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
 import { ChatMessage } from '@/types/chat';
-import { isAuthenticated, unauthorizedResponse } from '@/lib/auth';
+import { requireScope, AuthError } from '@/lib/tenant-auth';
 
 /**
  * Chat Message API
@@ -13,11 +13,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ messageId: string }> }
 ) {
-  if (!(await isAuthenticated(request))) {
-    return unauthorizedResponse();
-  }
-
   try {
+    const context = await requireScope(request, 'chat:write');
     const { messageId } = await params;
     const updates = await request.json();
     
@@ -34,7 +31,7 @@ export async function PATCH(
     const result = await db
       .collection<ChatMessage>('chats')
       .findOneAndUpdate(
-        { id: messageId },
+        { id: messageId, tenantId: context.tenantId },
         { $set: allowedUpdates },
         { returnDocument: 'after' }
       );
@@ -48,6 +45,9 @@ export async function PATCH(
     
     return NextResponse.json(result);
   } catch (error) {
+    if (error instanceof AuthError) {
+      return Response.json({ error: error.message }, { status: error.status });
+    }
     console.error('Error updating message:', error);
     return NextResponse.json(
       { error: 'Failed to update message' },

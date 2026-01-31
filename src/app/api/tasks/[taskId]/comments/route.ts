@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
 import { TaskComment, Task } from '@/types/kanban';
-import { isAuthenticated, unauthorizedResponse } from '@/lib/auth';
-import { logActivity, detectActor } from '@/lib/activity';
+import { requireScope, AuthError } from '@/lib/tenant-auth';
+import { logActivity } from '@/lib/activity';
 import crypto from 'crypto';
 
 function generateId(prefix: string): string {
@@ -14,22 +14,22 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
-  if (!(await isAuthenticated(request))) {
-    return unauthorizedResponse();
-  }
-
   try {
+    const context = await requireScope(request, 'tasks:read');
     const { taskId } = await params;
     const db = await getDb();
     
     const comments = await db
       .collection<TaskComment>('comments')
-      .find({ taskId })
+      .find({ tenantId: context.tenantId, taskId })
       .sort({ createdAt: 1 })
       .toArray();
     
     return NextResponse.json(comments);
   } catch (error) {
+    if (error instanceof AuthError) {
+      return Response.json({ error: error.message }, { status: error.status });
+    }
     console.error('Error fetching comments:', error);
     return NextResponse.json({ error: 'Failed to fetch comments' }, { status: 500 });
   }
@@ -40,11 +40,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
-  if (!(await isAuthenticated(request))) {
-    return unauthorizedResponse();
-  }
-
   try {
+    const context = await requireScope(request, 'tasks:write');
     const { taskId } = await params;
     const { content } = await request.json();
     
@@ -57,18 +54,21 @@ export async function POST(
     
     const db = await getDb();
     
-    // Get task to find boardId
-    const task = await db.collection<Task>('tasks').findOne({ id: taskId });
+    // Get task to find boardId and verify tenant
+    const task = await db.collection<Task>('tasks').findOne({ 
+      id: taskId,
+      tenantId: context.tenantId 
+    });
     if (!task) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
     
     // Detect actor
-    const apiKey = request.headers.get('x-api-key');
-    const actor = detectActor(apiKey);
+    const actor = context.type === 'apiKey' ? 'api' : 'mike';
     
     const comment: TaskComment = {
       id: generateId('cmt'),
+      tenantId: context.tenantId,
       taskId,
       boardId: task.boardId,
       author: actor,
@@ -80,6 +80,7 @@ export async function POST(
     
     // Log activity
     await logActivity({
+      tenantId: context.tenantId,
       taskId,
       boardId: task.boardId,
       action: 'commented',
@@ -91,6 +92,9 @@ export async function POST(
     
     return NextResponse.json(comment, { status: 201 });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return Response.json({ error: error.message }, { status: error.status });
+    }
     console.error('Error creating comment:', error);
     return NextResponse.json({ error: 'Failed to create comment' }, { status: 500 });
   }

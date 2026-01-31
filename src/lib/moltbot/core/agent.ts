@@ -11,6 +11,7 @@ import type { Task, Board } from '@/types/kanban';
 export interface MoltbotContext {
   userId: string;
   boardId: string;
+  tenantId?: string;
   recentTasks?: Task[];
   userPatterns?: UserPatterns;
 }
@@ -72,6 +73,7 @@ export class MoltbotAgent {
 
     await db.collection('chats').insertOne({
       id: messageId,
+      tenantId: this.context.tenantId,
       boardId: this.context.boardId,
       author: 'moltbot',
       content: message,
@@ -95,16 +97,31 @@ export class MoltbotAgent {
     const now = new Date();
     const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
 
+    // Build query with optional tenant filter
+    const query: Record<string, unknown> = { 
+      boardId: this.context.boardId, 
+      archived: { $ne: true } 
+    };
+    if (this.context.tenantId) {
+      query.tenantId = this.context.tenantId;
+    }
+
     // Get all tasks for this board
     const tasks = (await db
       .collection('tasks')
-      .find({ boardId: this.context.boardId, archived: { $ne: true } })
+      .find(query)
       .toArray()) as unknown as Task[];
+
+    // Activity query
+    const activityQuery: Record<string, unknown> = { boardId: this.context.boardId };
+    if (this.context.tenantId) {
+      activityQuery.tenantId = this.context.tenantId;
+    }
 
     // Get recent activity
     const recentActivity = (await db
       .collection('activities')
-      .find({ boardId: this.context.boardId })
+      .find(activityQuery)
       .sort({ timestamp: -1 })
       .limit(50)
       .toArray()) as unknown as Activity[];

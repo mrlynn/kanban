@@ -32,6 +32,7 @@ function generateTaskId(): string {
  * Process a chat message and potentially create a task
  */
 export async function processMessageForTask(
+  tenantId: string,
   message: string,
   boardId: string,
   userId: string
@@ -51,7 +52,7 @@ export async function processMessageForTask(
   }
 
   // Create the task
-  const task = await createTaskFromIntent(parseResult, boardId, userId);
+  const task = await createTaskFromIntent(tenantId, parseResult, boardId, userId);
 
   // Generate confirmation message
   const confirmation = formatTaskConfirmation(
@@ -73,6 +74,7 @@ export async function processMessageForTask(
  * Create a task from parsed intent
  */
 async function createTaskFromIntent(
+  tenantId: string,
   parseResult: ParseResult,
   boardId: string,
   userId: string
@@ -81,19 +83,20 @@ async function createTaskFromIntent(
   const intent = parseResult.intent;
 
   // Get the "To Do" column for this board
-  const toDoColumnId = await getToDoColumnId(db, boardId);
+  const toDoColumnId = await getToDoColumnId(db, tenantId, boardId);
 
   // Get max order for the column
   const maxOrderTask = await db
     .collection('tasks')
     .findOne(
-      { boardId, columnId: toDoColumnId },
+      { tenantId, boardId, columnId: toDoColumnId },
       { sort: { order: -1 } }
     );
   const order = (maxOrderTask?.order ?? 0) + 1;
 
   const task: Task = {
     id: generateTaskId(),
+    tenantId,
     title: intent.title || 'Untitled Task',
     description: `Created from chat: "${parseResult.originalMessage}"`,
     columnId: toDoColumnId,
@@ -109,9 +112,16 @@ async function createTaskFromIntent(
 
   await db.collection('tasks').insertOne(task);
 
+  // Update tenant usage
+  await db.collection('tenants').updateOne(
+    { id: tenantId },
+    { $inc: { 'usage.tasks': 1 } }
+  );
+
   // Log activity
   await db.collection('activities').insertOne({
     id: `act_${Date.now().toString(36)}`,
+    tenantId,
     taskId: task.id,
     taskTitle: task.title,
     boardId,
@@ -133,16 +143,17 @@ async function createTaskFromIntent(
  */
 async function getToDoColumnId(
   db: Awaited<ReturnType<typeof getDb>>,
+  tenantId: string,
   boardId: string
 ): Promise<string> {
   // Try to find the board and its columns
-  const board = await db.collection('boards').findOne({ id: boardId });
+  const board = await db.collection('boards').findOne({ id: boardId, tenantId });
 
   if (board?.columns && Array.isArray(board.columns)) {
     // Look for a "To Do" or similar column
     const toDoColumn = board.columns.find(
-      (col: { id?: string; name?: string }) => {
-        const name = col?.name?.toLowerCase() || '';
+      (col: { id?: string; name?: string; title?: string }) => {
+        const name = (col?.name || col?.title || '').toLowerCase();
         return (
           name.includes('to do') ||
           name.includes('todo') ||
@@ -165,6 +176,7 @@ async function getToDoColumnId(
  * Handle a chat message - check for task intent and respond
  */
 export async function handleChatMessage(
+  tenantId: string,
   messageId: string,
   content: string,
   boardId: string,
@@ -175,13 +187,14 @@ export async function handleChatMessage(
     return { taskCreated: false };
   }
 
-  const result = await processMessageForTask(content, boardId, author);
+  const result = await processMessageForTask(tenantId, content, boardId, author);
 
   if (result.created && result.confirmation) {
     // Post confirmation message
     const agent = new MoltbotAgent({
       userId: author,
       boardId,
+      tenantId,
     });
 
     const responseMessageId = await agent.sendProactiveMessage(

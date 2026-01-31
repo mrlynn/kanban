@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
 import { ChatMessage } from '@/types/chat';
-import { isAuthenticated, unauthorizedResponse } from '@/lib/auth';
-import { detectActor } from '@/lib/activity';
+import { requireScope, AuthError } from '@/lib/tenant-auth';
 import crypto from 'crypto';
 
 function generateId(prefix: string): string {
@@ -14,7 +13,7 @@ function generateId(prefix: string): string {
  * 
  * GET /api/chat - Fetch chat messages
  *   Query params:
- *   - boardId: Filter by board (optional, defaults to all)
+ *   - boardId: Filter by board (optional, defaults to all for tenant)
  *   - since: ISO timestamp for polling
  *   - limit: Max messages (default 50)
  *   - pendingOnly: Only get messages awaiting bot response
@@ -23,11 +22,9 @@ function generateId(prefix: string): string {
  */
 
 export async function GET(request: NextRequest) {
-  if (!(await isAuthenticated(request))) {
-    return unauthorizedResponse();
-  }
-
   try {
+    const context = await requireScope(request, 'chat:read');
+    
     const { searchParams } = new URL(request.url);
     const boardId = searchParams.get('boardId');
     const since = searchParams.get('since');
@@ -36,7 +33,8 @@ export async function GET(request: NextRequest) {
 
     const db = await getDb();
     
-    const query: Record<string, unknown> = {};
+    // Always filter by tenant
+    const query: Record<string, unknown> = { tenantId: context.tenantId };
     
     if (boardId) {
       query.boardId = boardId;
@@ -72,6 +70,9 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return Response.json({ error: error.message }, { status: error.status });
+    }
     console.error('Error fetching chat messages:', error);
     return NextResponse.json(
       { error: 'Failed to fetch messages' },
@@ -81,11 +82,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!(await isAuthenticated(request))) {
-    return unauthorizedResponse();
-  }
-
   try {
+    const context = await requireScope(request, 'chat:write');
+    
     const { content, boardId, taskId, taskTitle, replyTo } = await request.json();
     
     if (!content?.trim()) {
@@ -98,12 +97,12 @@ export async function POST(request: NextRequest) {
     const db = await getDb();
     
     // Detect actor
-    const apiKey = request.headers.get('x-api-key');
-    const actor = detectActor(apiKey);
+    const actor = context.type === 'apiKey' ? 'api' : 'mike';
     
     const message: ChatMessage = {
       id: generateId('msg'),
-      boardId: boardId || 'general',
+      tenantId: context.tenantId,
+      boardId: boardId || undefined, // undefined = global chat
       author: actor,
       content: content.trim(),
       taskId,
@@ -120,6 +119,7 @@ export async function POST(request: NextRequest) {
       try {
         const { handleChatMessage } = await import('@/lib/moltbot/features/task-creator');
         const result = await handleChatMessage(
+          context.tenantId,
           message.id,
           content.trim(),
           boardId || 'general',
@@ -137,6 +137,9 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json(message, { status: 201 });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return Response.json({ error: error.message }, { status: error.status });
+    }
     console.error('Error creating chat message:', error);
     return NextResponse.json(
       { error: 'Failed to send message' },

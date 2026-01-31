@@ -10,6 +10,7 @@ function generateId(prefix: string): string {
  * Log an activity for a task
  */
 export async function logActivity(params: {
+  tenantId: string;
   taskId: string;
   boardId: string;
   action: ActivityAction;
@@ -25,6 +26,7 @@ export async function logActivity(params: {
   
   const activity: TaskActivity = {
     id: generateId('act'),
+    tenantId: params.tenantId,
     taskId: params.taskId,
     boardId: params.boardId,
     action: params.action,
@@ -41,12 +43,12 @@ export async function logActivity(params: {
 /**
  * Get activities for a task
  */
-export async function getTaskActivities(taskId: string, limit = 50): Promise<TaskActivity[]> {
+export async function getTaskActivities(tenantId: string, taskId: string, limit = 50): Promise<TaskActivity[]> {
   const db = await getDb();
   
   return db
     .collection<TaskActivity>('activities')
-    .find({ taskId })
+    .find({ tenantId, taskId })
     .sort({ timestamp: -1 })
     .limit(limit)
     .toArray();
@@ -55,12 +57,26 @@ export async function getTaskActivities(taskId: string, limit = 50): Promise<Tas
 /**
  * Get recent activities for a board
  */
-export async function getBoardActivities(boardId: string, limit = 100): Promise<TaskActivity[]> {
+export async function getBoardActivities(tenantId: string, boardId: string, limit = 100): Promise<TaskActivity[]> {
   const db = await getDb();
   
   return db
     .collection<TaskActivity>('activities')
-    .find({ boardId })
+    .find({ tenantId, boardId })
+    .sort({ timestamp: -1 })
+    .limit(limit)
+    .toArray();
+}
+
+/**
+ * Get recent activities across all boards for a tenant
+ */
+export async function getTenantActivities(tenantId: string, limit = 100): Promise<TaskActivity[]> {
+  const db = await getDb();
+  
+  return db
+    .collection<TaskActivity>('activities')
+    .find({ tenantId })
     .sort({ timestamp: -1 })
     .limit(limit)
     .toArray();
