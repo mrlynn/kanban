@@ -532,7 +532,6 @@ export function Sidebar({ width }: SidebarProps) {
       <ChatPanel 
         open={chatOpen} 
         onClose={() => setChatOpen(false)} 
-        sidebarWidth={width}
       />
     </>
   );

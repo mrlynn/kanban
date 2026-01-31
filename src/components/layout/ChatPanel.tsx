@@ -23,7 +23,7 @@ import {
 import { ChatMessage } from '@/types/chat';
 import { Actor } from '@/types/kanban';
 
-const PANEL_WIDTH = 420;
+const PANEL_WIDTH = 400;
 
 const actorConfig: Record<Actor, { name: string; color: string; avatar: React.ReactNode }> = {
   mike: { name: 'Mike', color: '#3B82F6', avatar: <Person fontSize="small" /> },
@@ -50,10 +50,9 @@ function formatDate(date: Date): string {
 interface ChatPanelProps {
   open: boolean;
   onClose: () => void;
-  sidebarWidth: number;
 }
 
-export function ChatPanel({ open, onClose, sidebarWidth }: ChatPanelProps) {
+export function ChatPanel({ open, onClose }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -139,21 +138,21 @@ export function ChatPanel({ open, onClose, sidebarWidth }: ChatPanelProps) {
   }, {} as Record<string, ChatMessage[]>);
 
   return (
-    <Slide direction="right" in={open} mountOnEnter unmountOnExit>
+    <Slide direction="left" in={open} mountOnEnter unmountOnExit>
       <Box
         sx={{
           position: 'fixed',
-          left: sidebarWidth,
+          right: 0,
           top: 0,
           width: PANEL_WIDTH,
           height: '100vh',
           bgcolor: 'background.paper',
-          borderRight: '1px solid',
+          borderLeft: '1px solid',
           borderColor: alpha('#ffffff', 0.1),
           display: 'flex',
           flexDirection: 'column',
           zIndex: 1200,
-          boxShadow: '4px 0 20px rgba(0,0,0,0.3)',
+          boxShadow: '-4px 0 20px rgba(0,0,0,0.3)',
         }}
       >
         {/* Header */}
