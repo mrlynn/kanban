@@ -1,6 +1,7 @@
 import NextAuth from 'next-auth';
 import type { Provider } from 'next-auth/providers/index';
 import GitHubProvider from 'next-auth/providers/github';
+import GoogleProvider from 'next-auth/providers/google';
 import CredentialsProvider from 'next-auth/providers/credentials';
 
 const isDev = process.env.NODE_ENV === 'development';
@@ -11,6 +12,16 @@ const providers: Provider[] = [
     clientSecret: process.env.GITHUB_CLIENT_SECRET!,
   }),
 ];
+
+// Add Google OAuth if configured
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  providers.push(
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    })
+  );
+}
 
 // Add dev-only credentials provider for local testing
 if (isDev) {
@@ -46,23 +57,45 @@ const handler = NextAuth({
         return true;
       }
       
-      // Only allow specific GitHub users (you!)
-      const allowedUsers = process.env.ALLOWED_GITHUB_USERS?.split(',').map(u => u.toLowerCase().trim()) || [];
-      const githubUsername = (profile as any)?.login?.toLowerCase();
-      
-      console.log('[Auth] GitHub username:', githubUsername);
-      console.log('[Auth] Allowed users:', allowedUsers);
-      
-      if (allowedUsers.length === 0) {
-        // If no allowlist, allow anyone (for testing)
-        console.log('[Auth] No allowlist, allowing all');
-        return true;
+      // GitHub: check against username allowlist
+      if (account?.provider === 'github') {
+        const allowedUsers = process.env.ALLOWED_GITHUB_USERS?.split(',').map(u => u.toLowerCase().trim()) || [];
+        const githubUsername = (profile as any)?.login?.toLowerCase();
+        
+        console.log('[Auth] GitHub username:', githubUsername);
+        console.log('[Auth] Allowed GitHub users:', allowedUsers);
+        
+        if (allowedUsers.length === 0) {
+          console.log('[Auth] No GitHub allowlist, allowing all');
+          return true;
+        }
+        
+        const isAllowed = allowedUsers.includes(githubUsername);
+        console.log('[Auth] GitHub allowed:', isAllowed);
+        return isAllowed;
       }
       
-      const isAllowed = allowedUsers.includes(githubUsername);
-      console.log('[Auth] Is allowed:', isAllowed);
+      // Google: check against email allowlist
+      if (account?.provider === 'google') {
+        const allowedEmails = process.env.ALLOWED_GOOGLE_EMAILS?.split(',').map(e => e.toLowerCase().trim()) || [];
+        const userEmail = user?.email?.toLowerCase();
+        
+        console.log('[Auth] Google email:', userEmail);
+        console.log('[Auth] Allowed Google emails:', allowedEmails);
+        
+        if (allowedEmails.length === 0) {
+          // If no allowlist, allow anyone with Google (for testing)
+          console.log('[Auth] No Google allowlist, allowing all');
+          return true;
+        }
+        
+        const isAllowed = userEmail ? allowedEmails.includes(userEmail) : false;
+        console.log('[Auth] Google allowed:', isAllowed);
+        return isAllowed;
+      }
       
-      return isAllowed;
+      // Default: allow (for any future providers)
+      return true;
     },
     async session({ session, token }) {
       // Add username to session

@@ -13,17 +13,20 @@ import {
   alpha,
 } from '@mui/material';
 import GitHubIcon from '@mui/icons-material/GitHub';
+import GoogleIcon from '@mui/icons-material/Google';
 import CodeIcon from '@mui/icons-material/Code';
 
 export default function SignIn() {
   const [devUsername, setDevUsername] = useState('mike');
   const [isLoading, setIsLoading] = useState(false);
   const [hasDevLogin, setHasDevLogin] = useState(false);
+  const [hasGoogle, setHasGoogle] = useState(false);
 
-  // Check if dev-login provider is available
+  // Check which providers are available
   useEffect(() => {
     getProviders().then((providers) => {
       setHasDevLogin(!!providers?.['dev-login']);
+      setHasGoogle(!!providers?.['google']);
     });
   }, []);
 
@@ -94,6 +97,25 @@ export default function SignIn() {
           >
             Sign in with GitHub
           </Button>
+
+          {/* Google Login - only shown if provider is configured */}
+          {hasGoogle && (
+            <Button
+              variant="contained"
+              size="large"
+              fullWidth
+              startIcon={<GoogleIcon />}
+              onClick={() => signIn('google', { callbackUrl: '/' })}
+              sx={{
+                mt: 2,
+                bgcolor: '#4285F4',
+                py: 1.5,
+                '&:hover': { bgcolor: '#3367D6' },
+              }}
+            >
+              Sign in with Google
+            </Button>
+          )}
 
           {/* Dev Login - only shown if provider exists (dev mode) */}
           {hasDevLogin && (
