@@ -106,6 +106,53 @@ export async function PATCH(
       });
     }
     
+    // Track checklist changes (supports nested items)
+    if (updates.checklist !== undefined) {
+      // Recursive counter for nested checklists
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const countItems = (items: any[]): { completed: number; total: number } => {
+        let completed = 0, total = 0;
+        for (const item of items) {
+          total++;
+          if (item.completed) completed++;
+          if (item.children?.length) {
+            const child = countItems(item.children);
+            completed += child.completed;
+            total += child.total;
+          }
+        }
+        return { completed, total };
+      };
+      
+      const oldChecklist = currentTask.checklist || [];
+      const newChecklist = updates.checklist || [];
+      const oldCounts = countItems(oldChecklist);
+      const newCounts = countItems(newChecklist);
+      
+      // Determine what changed
+      let checklistNote = '';
+      if (newCounts.total > oldCounts.total) {
+        checklistNote = 'added checklist item';
+      } else if (newCounts.total < oldCounts.total) {
+        checklistNote = 'removed checklist item';
+      } else if (newCounts.completed !== oldCounts.completed) {
+        checklistNote = newCounts.completed > oldCounts.completed ? 'completed checklist item' : 'uncompleted checklist item';
+      }
+      
+      if (checklistNote) {
+        await logActivity({
+          taskId,
+          boardId,
+          action: 'updated',
+          actor,
+          details: {
+            field: 'checklist',
+            note: `${checklistNote} (${newCounts.completed}/${newCounts.total})`,
+          },
+        });
+      }
+    }
+    
     // Track general updates (title, description, labels, dueDate)
     const trackedFields = ['title', 'description', 'labels', 'dueDate'];
     const changedFields = trackedFields.filter(

@@ -23,17 +23,74 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '0', 10);
     const offset = parseInt(searchParams.get('offset') || '0', 10);
     
+    // Search & Filter params
+    const q = searchParams.get('q');
+    const label = searchParams.get('label');
+    const assignee = searchParams.get('assignee');
+    const priority = searchParams.get('priority');
+    const overdue = searchParams.get('overdue');
+    const hasDueDate = searchParams.get('hasDueDate');
+    
     const db = await getDb();
     
     // Build query
     const query: Record<string, unknown> = {};
     if (boardId) query.boardId = boardId;
     
-    // Archive filtering
-    if (archivedOnly) {
-      query.archived = true;
-    } else if (!includeArchived) {
-      query.$or = [{ archived: { $exists: false } }, { archived: false }];
+    // Text search (title and description)
+    if (q) {
+      query.$or = [
+        { title: { $regex: q, $options: 'i' } },
+        { description: { $regex: q, $options: 'i' } },
+      ];
+    }
+    
+    // Filter by label
+    if (label) {
+      query.labels = label;
+    }
+    
+    // Filter by assignee
+    if (assignee) {
+      query.assigneeId = assignee;
+    }
+    
+    // Filter by priority
+    if (priority) {
+      query.priority = priority;
+    }
+    
+    // Filter overdue tasks
+    if (overdue === 'true') {
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      query.dueDate = { $lt: now };
+    }
+    
+    // Filter tasks with due dates
+    if (hasDueDate === 'true') {
+      query.dueDate = { $exists: true, $ne: null };
+    } else if (hasDueDate === 'false') {
+      query.$or = [{ dueDate: { $exists: false } }, { dueDate: null }];
+    }
+    
+    // Archive filtering (must be combined carefully with $or)
+    const archiveCondition = archivedOnly
+      ? { archived: true }
+      : !includeArchived
+      ? { $or: [{ archived: { $exists: false } }, { archived: false }] }
+      : {};
+    
+    // Merge archive condition
+    if (archiveCondition.$or && query.$or) {
+      // Need $and to combine multiple $or conditions
+      const textOr = query.$or;
+      delete query.$or;
+      query.$and = [{ $or: textOr }, archiveCondition];
+    } else if (archiveCondition.$or) {
+      query.$or = archiveCondition.$or;
+    } else if (archiveCondition.archived !== undefined) {
+      query.archived = archiveCondition.archived;
     }
     
     let cursor = db

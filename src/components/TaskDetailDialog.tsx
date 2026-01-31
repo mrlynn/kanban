@@ -17,6 +17,10 @@ import {
   CircularProgress,
   Tab,
   Tabs,
+  Checkbox,
+  LinearProgress,
+  Collapse,
+  Tooltip,
 } from '@mui/material';
 import {
   Close,
@@ -29,14 +33,22 @@ import {
   Delete,
   Comment as CommentIcon,
   PriorityHigh,
+  Warning,
+  CheckCircle,
+  CheckCircleOutline,
+  RadioButtonUnchecked,
+  SubdirectoryArrowRight,
+  ExpandMore,
+  ChevronRight,
 } from '@mui/icons-material';
-import { Task, TaskComment, TaskActivity, PriorityConfig, Actor } from '@/types/kanban';
+import { Task, TaskComment, TaskActivity, PriorityConfig, Actor, USERS, ChecklistItem, countChecklistItems } from '@/types/kanban';
 
 interface TaskDetailDialogProps {
   open: boolean;
   task: Task | null;
   onClose: () => void;
   onEdit: (task: Task) => void;
+  onUpdate?: (taskId: string, updates: Partial<Task>) => Promise<void>;
   columnNames: Record<string, string>;
 }
 
@@ -79,6 +91,45 @@ function formatTimeAgo(date: Date): string {
   return new Date(date).toLocaleDateString();
 }
 
+function formatDueDate(date: Date): string {
+  const d = new Date(date);
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  today.setHours(0, 0, 0, 0);
+  tomorrow.setHours(0, 0, 0, 0);
+  const compareDate = new Date(d);
+  compareDate.setHours(0, 0, 0, 0);
+
+  if (compareDate.getTime() === today.getTime()) return 'Today';
+  if (compareDate.getTime() === tomorrow.getTime()) return 'Tomorrow';
+  
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function getDueDateStatus(date: Date): 'overdue' | 'today' | 'soon' | 'normal' {
+  const d = new Date(date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const compareDate = new Date(d);
+  compareDate.setHours(0, 0, 0, 0);
+  
+  const diffDays = Math.ceil((compareDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  
+  if (diffDays < 0) return 'overdue';
+  if (diffDays === 0) return 'today';
+  if (diffDays <= 2) return 'soon';
+  return 'normal';
+}
+
+const dueDateColors = {
+  overdue: { bg: '#DC2626', text: '#FFF' },
+  today: { bg: '#F97316', text: '#FFF' },
+  soon: { bg: '#EAB308', text: '#000' },
+  normal: { bg: '#6B7280', text: '#FFF' },
+};
+
 function ActivityIcon({ action }: { action: string }) {
   switch (action) {
     case 'created':
@@ -98,11 +149,17 @@ function ActivityIcon({ action }: { action: string }) {
   }
 }
 
+// Generate unique ID for checklist items
+function generateChecklistItemId(): string {
+  return `chk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
 export function TaskDetailDialog({
   open,
   task,
   onClose,
   onEdit,
+  onUpdate,
   columnNames,
 }: TaskDetailDialogProps) {
   const [tabValue, setTabValue] = useState(0);
@@ -111,11 +168,15 @@ export function TaskDetailDialog({
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
+  const [newChecklistItem, setNewChecklistItem] = useState('');
+  const [checklistUpdating, setChecklistUpdating] = useState(false);
 
   // Fetch comments and activities when task changes
   useEffect(() => {
     if (task && open) {
       setLoading(true);
+      setChecklist(task.checklist || []);
       Promise.all([
         fetch(`/api/tasks/${task.id}/comments`).then((r) => r.json()),
         fetch(`/api/tasks/${task.id}/activities`).then((r) => r.json()),
@@ -128,6 +189,115 @@ export function TaskDetailDialog({
         .finally(() => setLoading(false));
     }
   }, [task, open]);
+
+  // Checklist handlers - support nested items
+  const updateChecklist = async (newChecklist: ChecklistItem[]) => {
+    if (!task || !onUpdate) return;
+    setChecklistUpdating(true);
+    try {
+      await onUpdate(task.id, { checklist: newChecklist });
+      setChecklist(newChecklist);
+    } catch (error) {
+      console.error('Failed to update checklist:', error);
+    } finally {
+      setChecklistUpdating(false);
+    }
+  };
+
+  // Recursively find and update an item
+  const updateItemRecursive = (
+    items: ChecklistItem[],
+    itemId: string,
+    updater: (item: ChecklistItem) => ChecklistItem | null
+  ): ChecklistItem[] => {
+    return items
+      .map((item) => {
+        if (item.id === itemId) {
+          return updater(item);
+        }
+        if (item.children?.length) {
+          return {
+            ...item,
+            children: updateItemRecursive(item.children, itemId, updater),
+          };
+        }
+        return item;
+      })
+      .filter((item): item is ChecklistItem => item !== null)
+      .map((item, idx) => ({ ...item, order: idx }));
+  };
+
+  // Check if all children are completed
+  const allChildrenCompleted = (item: ChecklistItem): boolean => {
+    if (!item.children?.length) return true;
+    return item.children.every((child) => child.completed && allChildrenCompleted(child));
+  };
+
+  // Auto-bubble completion up to parents
+  const bubbleCompletion = (items: ChecklistItem[]): ChecklistItem[] => {
+    return items.map((item) => {
+      if (item.children?.length) {
+        const updatedChildren = bubbleCompletion(item.children);
+        const shouldComplete = updatedChildren.every((c) => c.completed);
+        return {
+          ...item,
+          children: updatedChildren,
+          completed: shouldComplete,
+        };
+      }
+      return item;
+    });
+  };
+
+  const handleAddChecklistItem = async (parentId?: string) => {
+    if (!newChecklistItem.trim()) return;
+    const newItem: ChecklistItem = {
+      id: generateChecklistItemId(),
+      text: newChecklistItem.trim(),
+      completed: false,
+      order: 0,
+    };
+
+    let newChecklist: ChecklistItem[];
+    if (parentId) {
+      // Add as child of parent
+      newChecklist = updateItemRecursive(checklist, parentId, (parent) => ({
+        ...parent,
+        completed: false, // Uncheck parent when adding child
+        children: [...(parent.children || []), { ...newItem, order: (parent.children?.length || 0) }],
+      }));
+    } else {
+      // Add at root level
+      newChecklist = [...checklist, { ...newItem, order: checklist.length }];
+    }
+    await updateChecklist(newChecklist);
+    setNewChecklistItem('');
+    setAddingChildTo(null);
+  };
+
+  const handleToggleChecklistItem = async (itemId: string) => {
+    let newChecklist = updateItemRecursive(checklist, itemId, (item) => ({
+      ...item,
+      completed: !item.completed,
+      // If unchecking, keep children as-is. If checking, also check all children
+      children: !item.completed
+        ? item.children?.map(function markComplete(c): ChecklistItem {
+            return { ...c, completed: true, children: c.children?.map(markComplete) };
+          })
+        : item.children,
+    }));
+    // Auto-bubble: check if parents should auto-complete
+    newChecklist = bubbleCompletion(newChecklist);
+    await updateChecklist(newChecklist);
+  };
+
+  const handleDeleteChecklistItem = async (itemId: string) => {
+    const newChecklist = updateItemRecursive(checklist, itemId, () => null);
+    await updateChecklist(bubbleCompletion(newChecklist));
+  };
+
+  // State for adding child items
+  const [addingChildTo, setAddingChildTo] = useState<string | null>(null);
 
   const handleSubmitComment = async () => {
     if (!task || !newComment.trim()) return;
@@ -159,6 +329,7 @@ export function TaskDetailDialog({
   if (!task) return null;
 
   const priorityConfig = task.priority ? PriorityConfig[task.priority] : null;
+  const assignee = task.assigneeId ? USERS.find(u => u.id === task.assigneeId) : null;
 
   return (
     <Dialog
@@ -208,22 +379,43 @@ export function TaskDetailDialog({
             ))}
           </Box>
           <Typography variant="h6">{task.title}</Typography>
-          {task.dueDate && (
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 0.5,
-                color: 'text.secondary',
-                mt: 0.5,
-              }}
-            >
-              <CalendarToday sx={{ fontSize: 16 }} />
-              <Typography variant="body2">
-                Due {new Date(task.dueDate).toLocaleDateString()}
-              </Typography>
-            </Box>
-          )}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1, flexWrap: 'wrap' }}>
+            {task.dueDate && (() => {
+              const status = getDueDateStatus(task.dueDate);
+              const colors = dueDateColors[status];
+              return (
+                <Chip
+                  icon={status === 'overdue' ? <Warning sx={{ fontSize: 16 }} /> : <CalendarToday sx={{ fontSize: 16 }} />}
+                  label={`Due ${formatDueDate(task.dueDate)}`}
+                  size="small"
+                  sx={{
+                    fontWeight: 600,
+                    bgcolor: alpha(colors.bg, status === 'normal' ? 0.2 : 0.9),
+                    color: status === 'normal' ? 'text.secondary' : colors.text,
+                    '& .MuiChip-icon': {
+                      color: status === 'normal' ? 'text.secondary' : colors.text,
+                    },
+                  }}
+                />
+              );
+            })()}
+            {assignee && (
+              <Chip
+                avatar={
+                  <Avatar sx={{ bgcolor: assignee.color, width: 24, height: 24, fontSize: '0.75rem' }}>
+                    {assignee.avatar || assignee.name[0]}
+                  </Avatar>
+                }
+                label={assignee.name}
+                size="small"
+                sx={{
+                  bgcolor: alpha(assignee.color, 0.15),
+                  color: assignee.color,
+                  fontWeight: 500,
+                }}
+              />
+            )}
+          </Box>
         </Box>
         <Box sx={{ display: 'flex', gap: 1 }}>
           <IconButton size="small" onClick={() => onEdit(task)}>
@@ -243,6 +435,204 @@ export function TaskDetailDialog({
             </Typography>
           </Box>
         )}
+
+        {/* Checklist Section */}
+        <Box sx={{ mb: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+            <Typography variant="subtitle2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <CheckCircleOutline fontSize="small" />
+              Checklist
+              {checklist.length > 0 && (() => {
+                const { completed, total } = countChecklistItems(checklist);
+                return (
+                  <Chip
+                    label={`${completed}/${total}`}
+                    size="small"
+                    sx={{ height: 20, fontSize: '0.7rem' }}
+                  />
+                );
+              })()}
+            </Typography>
+            {checklistUpdating && <CircularProgress size={16} />}
+          </Box>
+          
+          {/* Progress bar */}
+          {checklist.length > 0 && (() => {
+            const { completed, total } = countChecklistItems(checklist);
+            const percent = total > 0 ? (completed / total) * 100 : 0;
+            return (
+              <LinearProgress
+                variant="determinate"
+                value={percent}
+                sx={{
+                  height: 6,
+                  borderRadius: 3,
+                  mb: 2,
+                  bgcolor: alpha('#6B7280', 0.2),
+                  '& .MuiLinearProgress-bar': {
+                    bgcolor: completed === total ? '#22C55E' : '#3B82F6',
+                  },
+                }}
+              />
+            );
+          })()}
+
+          {/* Recursive Checklist Item Renderer */}
+          {(() => {
+            const renderChecklistItem = (item: ChecklistItem, depth: number = 0) => (
+              <Box key={item.id}>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.5,
+                    py: 0.5,
+                    px: 1,
+                    pl: 1 + depth * 3,
+                    borderRadius: 1,
+                    '&:hover': {
+                      bgcolor: alpha('#6B7280', 0.1),
+                      '& .item-actions': { opacity: 1 },
+                    },
+                  }}
+                >
+                  {depth > 0 && (
+                    <SubdirectoryArrowRight 
+                      sx={{ fontSize: 16, color: 'text.disabled', ml: -2 }} 
+                    />
+                  )}
+                  <Checkbox
+                    checked={item.completed}
+                    onChange={() => handleToggleChecklistItem(item.id)}
+                    size="small"
+                    sx={{
+                      p: 0.5,
+                      color: 'text.secondary',
+                      '&.Mui-checked': { color: '#22C55E' },
+                    }}
+                  />
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      flex: 1,
+                      textDecoration: item.completed ? 'line-through' : 'none',
+                      color: item.completed ? 'text.secondary' : 'text.primary',
+                    }}
+                  >
+                    {item.text}
+                  </Typography>
+                  {item.children?.length ? (
+                    <Chip
+                      label={`${item.children.filter(c => c.completed).length}/${item.children.length}`}
+                      size="small"
+                      sx={{ height: 18, fontSize: '0.65rem', bgcolor: alpha('#6B7280', 0.15) }}
+                    />
+                  ) : null}
+                  <Box
+                    className="item-actions"
+                    sx={{ display: 'flex', gap: 0.25, opacity: 0, transition: 'opacity 0.2s' }}
+                  >
+                    <Tooltip title="Add sub-item">
+                      <IconButton
+                        size="small"
+                        onClick={() => setAddingChildTo(addingChildTo === item.id ? null : item.id)}
+                        sx={{ 
+                          color: addingChildTo === item.id ? 'primary.main' : 'text.secondary',
+                          bgcolor: addingChildTo === item.id ? alpha('#3B82F6', 0.1) : 'transparent',
+                        }}
+                      >
+                        <Add sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Tooltip>
+                    <IconButton
+                      size="small"
+                      onClick={() => handleDeleteChecklistItem(item.id)}
+                    >
+                      <Delete sx={{ fontSize: 16, color: 'error.main' }} />
+                    </IconButton>
+                  </Box>
+                </Box>
+                
+                {/* Add child input */}
+                <Collapse in={addingChildTo === item.id}>
+                  <Box sx={{ display: 'flex', gap: 1, py: 1, pl: 4 + depth * 3 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      placeholder="Add sub-item..."
+                      value={newChecklistItem}
+                      onChange={(e) => setNewChecklistItem(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleAddChecklistItem(item.id);
+                        }
+                        if (e.key === 'Escape') {
+                          setAddingChildTo(null);
+                          setNewChecklistItem('');
+                        }
+                      }}
+                      autoFocus
+                      sx={{ '& .MuiOutlinedInput-root': { bgcolor: alpha('#3B82F6', 0.05) } }}
+                    />
+                    <Button
+                      variant="contained"
+                      size="small"
+                      onClick={() => handleAddChecklistItem(item.id)}
+                      disabled={!newChecklistItem.trim() || checklistUpdating}
+                    >
+                      <Add fontSize="small" />
+                    </Button>
+                  </Box>
+                </Collapse>
+                
+                {/* Render children */}
+                {item.children?.map((child) => renderChecklistItem(child, depth + 1))}
+              </Box>
+            );
+
+            return (
+              <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                {checklist.map((item) => renderChecklistItem(item, 0))}
+              </Box>
+            );
+          })()}
+
+          {/* Add new root item */}
+          <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="Add an item..."
+              value={addingChildTo ? '' : newChecklistItem}
+              onChange={(e) => {
+                if (!addingChildTo) setNewChecklistItem(e.target.value);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey && !addingChildTo) {
+                  e.preventDefault();
+                  handleAddChecklistItem();
+                }
+              }}
+              disabled={!!addingChildTo}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  bgcolor: alpha('#6B7280', 0.05),
+                },
+              }}
+            />
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => handleAddChecklistItem()}
+              disabled={!newChecklistItem.trim() || checklistUpdating || !!addingChildTo}
+            >
+              <Add fontSize="small" />
+            </Button>
+          </Box>
+        </Box>
+
+        <Divider sx={{ mb: 2 }} />
 
         <Tabs
           value={tabValue}

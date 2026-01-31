@@ -1,0 +1,63 @@
+{
+  "id": "moltboard",
+  "name": "Moltboard",
+  "description": "Moltboard task management channel",
+  "version": "1.0.0",
+  "channels": ["moltboard"],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": {
+        "type": "boolean",
+        "default": true
+      },
+      "apiUrl": {
+        "type": "string",
+        "description": "Moltboard API base URL"
+      },
+      "apiKey": {
+        "type": "string",
+        "description": "API key for moltbot authentication"
+      },
+      "pollIntervalMs": {
+        "type": "number",
+        "default": 5000
+      },
+      "defaultBoardId": {
+        "type": "string",
+        "description": "Default board for routing"
+      },
+      "accounts": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "apiUrl": { "type": "string" },
+            "apiKey": { "type": "string" },
+            "pollIntervalMs": { "type": "number" },
+            "defaultBoardId": { "type": "string" }
+          }
+        }
+      }
+    }
+  },
+  "uiHints": {
+    "apiKey": {
+      "label": "API Key",
+      "sensitive": true
+    },
+    "apiUrl": {
+      "label": "Moltboard API URL",
+      "placeholder": "https://moltboard.app"
+    },
+    "pollIntervalMs": {
+      "label": "Poll Interval (ms)",
+      "placeholder": "5000"
+    },
+    "defaultBoardId": {
+      "label": "Default Board ID"
+    }
+  }
+}

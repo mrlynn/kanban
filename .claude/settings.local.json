@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:docs.molt.bot)",
+      "WebFetch(domain:github.com)",
+      "Bash(clawdbot gateway:*)"
+    ]
+  }
+}

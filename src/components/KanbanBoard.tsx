@@ -22,12 +22,13 @@ import {
   Badge,
 } from '@mui/material';
 import { Archive } from '@mui/icons-material';
-import { Board, Task, Column } from '@/types/kanban';
+import { Board, Task, Column, Priority } from '@/types/kanban';
 import { KanbanColumn } from './KanbanColumn';
 import { TaskCard } from './TaskCard';
 import { TaskDialog } from './TaskDialog';
 import { TaskDetailDialog } from './TaskDetailDialog';
 import { ArchiveDrawer } from './ArchiveDrawer';
+import { SearchFilterBar, SearchFilters, defaultFilters } from './SearchFilterBar';
 
 interface KanbanBoardProps {
   boardId: string;
@@ -66,6 +67,9 @@ export function KanbanBoard({ boardId }: KanbanBoardProps) {
   // Archive drawer state
   const [archiveDrawerOpen, setArchiveDrawerOpen] = useState(false);
   const [archivedCount, setArchivedCount] = useState(0);
+  
+  // Search & Filter state
+  const [filters, setFilters] = useState<SearchFilters>(defaultFilters);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -86,6 +90,69 @@ export function KanbanBoard({ boardId }: KanbanBoardProps) {
       return acc;
     }, {} as Record<string, string>);
   }, [board]);
+
+  // Extract all unique labels from tasks
+  const availableLabels = useMemo(() => {
+    const labelSet = new Set<string>();
+    tasks.forEach((task) => {
+      task.labels?.forEach((label) => labelSet.add(label));
+    });
+    return Array.from(labelSet).sort();
+  }, [tasks]);
+
+  // Filter tasks based on search and filters
+  const filteredTasks = useMemo(() => {
+    return tasks.filter((task) => {
+      // Text search
+      if (filters.q) {
+        const searchLower = filters.q.toLowerCase();
+        const titleMatch = task.title.toLowerCase().includes(searchLower);
+        const descMatch = task.description?.toLowerCase().includes(searchLower);
+        if (!titleMatch && !descMatch) return false;
+      }
+
+      // Label filter
+      if (filters.labels.length > 0) {
+        if (!filters.labels.some((label) => task.labels?.includes(label))) return false;
+      }
+
+      // Assignee filter
+      if (filters.assignees.length > 0) {
+        if (!task.assigneeId || !filters.assignees.includes(task.assigneeId)) return false;
+      }
+
+      // Priority filter
+      if (filters.priorities.length > 0) {
+        if (!task.priority || !filters.priorities.includes(task.priority)) return false;
+      }
+
+      // Overdue filter
+      if (filters.overdue) {
+        if (!task.dueDate) return false;
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+        if (new Date(task.dueDate) >= now) return false;
+      }
+
+      // Has due date filter
+      if (filters.hasDueDate === true && !task.dueDate) return false;
+      if (filters.hasDueDate === false && task.dueDate) return false;
+
+      return true;
+    });
+  }, [tasks, filters]);
+
+  // Check if any filters are active
+  const hasActiveFilters = useMemo(() => {
+    return (
+      filters.q !== '' ||
+      filters.labels.length > 0 ||
+      filters.assignees.length > 0 ||
+      filters.priorities.length > 0 ||
+      filters.overdue ||
+      filters.hasDueDate !== null
+    );
+  }, [filters]);
 
   // Fetch comment stats
   const fetchCommentStats = useCallback(async () => {
@@ -148,9 +215,9 @@ export function KanbanBoard({ boardId }: KanbanBoardProps) {
     fetchData();
   }, [fetchData]);
 
-  // Get tasks for a specific column
+  // Get tasks for a specific column (uses filtered tasks)
   const getTasksByColumn = (columnId: string) => {
-    return tasks
+    return filteredTasks
       .filter((task) => task.columnId === columnId)
       .sort((a, b) => a.order - b.order);
   };
@@ -383,7 +450,7 @@ export function KanbanBoard({ boardId }: KanbanBoardProps) {
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
             {board.name}
@@ -406,6 +473,20 @@ export function KanbanBoard({ boardId }: KanbanBoardProps) {
         >
           Archive
         </Button>
+      </Box>
+      
+      {/* Search & Filter Bar */}
+      <Box sx={{ mb: 2 }}>
+        <SearchFilterBar
+          filters={filters}
+          onFiltersChange={setFilters}
+          availableLabels={availableLabels}
+        />
+        {hasActiveFilters && (
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+            Showing {filteredTasks.length} of {tasks.length} tasks
+          </Typography>
+        )}
       </Box>
 
       <DndContext
@@ -469,6 +550,20 @@ export function KanbanBoard({ boardId }: KanbanBoardProps) {
         onEdit={(task) => {
           setDetailDialogOpen(false);
           handleEditTask(task);
+        }}
+        onUpdate={async (taskId, updates) => {
+          const res = await fetch(`/api/tasks/${taskId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updates),
+          });
+          if (res.ok) {
+            const updated = await res.json();
+            setTasks((prev) =>
+              prev.map((t) => (t.id === updated.id ? updated : t))
+            );
+            setSelectedTask(updated);
+          }
         }}
         columnNames={columnNames}
       />

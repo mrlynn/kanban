@@ -1,15 +1,50 @@
 import NextAuth from 'next-auth';
 import GitHubProvider from 'next-auth/providers/github';
+import CredentialsProvider from 'next-auth/providers/credentials';
+
+const isDev = process.env.NODE_ENV === 'development';
+
+const providers = [
+  GitHubProvider({
+    clientId: process.env.GITHUB_CLIENT_ID!,
+    clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+  }),
+];
+
+// Add dev-only credentials provider for local testing
+if (isDev) {
+  providers.push(
+    CredentialsProvider({
+      id: 'dev-login',
+      name: 'Dev Login',
+      credentials: {
+        username: { label: 'Username', type: 'text', placeholder: 'mike' },
+      },
+      async authorize(credentials) {
+        // In dev mode, allow any username
+        if (credentials?.username) {
+          return {
+            id: 'dev-user',
+            name: credentials.username,
+            email: `${credentials.username}@localhost`,
+            image: null,
+          };
+        }
+        return null;
+      },
+    })
+  );
+}
 
 const handler = NextAuth({
-  providers: [
-    GitHubProvider({
-      clientId: process.env.GITHUB_CLIENT_ID!,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-    }),
-  ],
+  providers,
   callbacks: {
-    async signIn({ user, profile }) {
+    async signIn({ user, profile, account }) {
+      // Dev login always allowed
+      if (account?.provider === 'dev-login') {
+        return true;
+      }
+      
       // Only allow specific GitHub users (you!)
       const allowedUsers = process.env.ALLOWED_GITHUB_USERS?.split(',').map(u => u.toLowerCase().trim()) || [];
       const githubUsername = (profile as any)?.login?.toLowerCase();
@@ -29,15 +64,18 @@ const handler = NextAuth({
       return isAllowed;
     },
     async session({ session, token }) {
-      // Add GitHub username to session
+      // Add username to session
       if (session.user) {
-        (session.user as any).username = token.username;
+        (session.user as any).username = token.username || token.name;
       }
       return session;
     },
-    async jwt({ token, profile }) {
+    async jwt({ token, profile, user }) {
       if (profile) {
         token.username = (profile as any).login;
+      }
+      if (user) {
+        token.username = user.name;
       }
       return token;
     },

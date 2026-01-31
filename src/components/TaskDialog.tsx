@@ -14,8 +14,14 @@ import {
   ToggleButtonGroup,
   ToggleButton,
   Typography,
+  IconButton,
+  Autocomplete,
+  Avatar,
 } from '@mui/material';
-import { Task, Priority, PriorityConfig } from '@/types/kanban';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { Clear } from '@mui/icons-material';
+import dayjs, { Dayjs } from 'dayjs';
+import { Task, Priority, PriorityConfig, USERS, User } from '@/types/kanban';
 
 interface TaskDialogProps {
   open: boolean;
@@ -49,7 +55,8 @@ export function TaskDialog({ open, task, onClose, onSave }: TaskDialogProps) {
   const [description, setDescription] = useState('');
   const [labels, setLabels] = useState<string[]>([]);
   const [priority, setPriority] = useState<Priority | ''>('');
-  const [dueDate, setDueDate] = useState('');
+  const [dueDate, setDueDate] = useState<Dayjs | null>(null);
+  const [assignee, setAssignee] = useState<User | null>(null);
 
   // Reset form when task changes
   useEffect(() => {
@@ -58,17 +65,15 @@ export function TaskDialog({ open, task, onClose, onSave }: TaskDialogProps) {
       setDescription(task.description || '');
       setLabels(task.labels || []);
       setPriority(task.priority || '');
-      setDueDate(
-        task.dueDate
-          ? new Date(task.dueDate).toISOString().split('T')[0]
-          : ''
-      );
+      setDueDate(task.dueDate ? dayjs(task.dueDate) : null);
+      setAssignee(USERS.find(u => u.id === task.assigneeId) || null);
     } else {
       setTitle('');
       setDescription('');
       setLabels([]);
       setPriority('');
-      setDueDate('');
+      setDueDate(null);
+      setAssignee(null);
     }
   }, [task, open]);
 
@@ -95,7 +100,8 @@ export function TaskDialog({ open, task, onClose, onSave }: TaskDialogProps) {
       description: description.trim() || undefined,
       labels: labels.length > 0 ? labels : undefined,
       priority: priority || undefined,
-      dueDate: dueDate ? new Date(dueDate) : undefined,
+      dueDate: dueDate ? dueDate.toDate() : undefined,
+      assigneeId: assignee?.id || undefined,
     });
   };
 
@@ -175,10 +181,93 @@ export function TaskDialog({ open, task, onClose, onSave }: TaskDialogProps) {
             </ToggleButtonGroup>
           </Box>
           
+          {/* Due Date */}
           <Box>
-            <Box sx={{ mb: 1, color: 'text.secondary', fontSize: '0.875rem' }}>
-              Labels
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Due Date
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <DatePicker
+                value={dueDate}
+                onChange={(newValue) => setDueDate(newValue)}
+                slotProps={{
+                  textField: {
+                    size: 'small',
+                    fullWidth: true,
+                    placeholder: 'Select date',
+                  },
+                }}
+              />
+              {dueDate && (
+                <IconButton 
+                  size="small" 
+                  onClick={() => setDueDate(null)}
+                  sx={{ color: 'text.secondary' }}
+                >
+                  <Clear fontSize="small" />
+                </IconButton>
+              )}
             </Box>
+          </Box>
+          
+          {/* Assignee */}
+          <Box>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Assignee
+            </Typography>
+            <Autocomplete
+              value={assignee}
+              onChange={(_, newValue) => setAssignee(newValue)}
+              options={USERS}
+              getOptionLabel={(option) => option.name}
+              isOptionEqualToValue={(option, value) => option.id === value.id}
+              renderOption={(props, option) => (
+                <Box component="li" {...props} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Avatar 
+                    sx={{ 
+                      width: 28, 
+                      height: 28, 
+                      bgcolor: option.color,
+                      fontSize: '0.875rem',
+                    }}
+                  >
+                    {option.avatar || option.name[0]}
+                  </Avatar>
+                  <Typography variant="body2">{option.name}</Typography>
+                </Box>
+              )}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  size="small"
+                  placeholder="Unassigned"
+                  InputProps={{
+                    ...params.InputProps,
+                    startAdornment: assignee ? (
+                      <Avatar 
+                        sx={{ 
+                          width: 24, 
+                          height: 24, 
+                          bgcolor: assignee.color,
+                          fontSize: '0.75rem',
+                          ml: 0.5,
+                          mr: -0.5,
+                        }}
+                      >
+                        {assignee.avatar || assignee.name[0]}
+                      </Avatar>
+                    ) : null,
+                  }}
+                />
+              )}
+            />
+          </Box>
+          
+          {/* Labels */}
+          <Box>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              Labels
+            </Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
               {availableLabels.map((label) => (
                 <Chip
@@ -204,15 +293,6 @@ export function TaskDialog({ open, task, onClose, onSave }: TaskDialogProps) {
               ))}
             </Box>
           </Box>
-          
-          <TextField
-            label="Due Date"
-            type="date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-            fullWidth
-          />
         </Box>
       </DialogContent>
       

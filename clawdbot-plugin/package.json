@@ -1,0 +1,35 @@
+{
+  "name": "moltboard",
+  "version": "1.0.0",
+  "description": "Clawdbot channel plugin for Moltboard",
+  "type": "module",
+  "main": "index.ts",
+  "types": "index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/**/*.ts"
+  },
+  "clawdbot": {
+    "extensions": ["./index.ts"],
+    "channel": {
+      "id": "moltboard",
+      "label": "Moltboard",
+      "selectionLabel": "Moltboard (Task Board)",
+      "docsPath": "/channels/moltboard",
+      "docsLabel": "moltboard",
+      "blurb": "Task management chat via Moltboard. 🔥",
+      "order": 80,
+      "aliases": ["mb", "tasks", "kanban"]
+    }
+  },
+  "dependencies": {
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0"
+  },
+  "peerDependencies": {
+    "clawdbot": "*"
+  }
+}

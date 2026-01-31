@@ -11,6 +11,7 @@ import {
   IconButton,
   alpha,
   Tooltip,
+  Avatar,
 } from '@mui/material';
 import {
   DragIndicator,
@@ -21,8 +22,11 @@ import {
   Archive,
   Unarchive,
   LocalFireDepartment,
+  Warning,
+  CheckCircleOutline,
 } from '@mui/icons-material';
-import { Task, PriorityConfig } from '@/types/kanban';
+import { LinearProgress } from '@mui/material';
+import { Task, PriorityConfig, USERS, countChecklistItems } from '@/types/kanban';
 
 interface TaskCardProps {
   task: Task;
@@ -54,6 +58,59 @@ const labelColors: Record<string, string> = {
   completed: '#22C55E',
 };
 
+// Helper functions for due date display
+function formatDueDate(date: Date): string {
+  const d = new Date(date);
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  // Reset time for comparison
+  today.setHours(0, 0, 0, 0);
+  tomorrow.setHours(0, 0, 0, 0);
+  yesterday.setHours(0, 0, 0, 0);
+  const compareDate = new Date(d);
+  compareDate.setHours(0, 0, 0, 0);
+
+  if (compareDate.getTime() === today.getTime()) return 'Today';
+  if (compareDate.getTime() === tomorrow.getTime()) return 'Tomorrow';
+  if (compareDate.getTime() === yesterday.getTime()) return 'Yesterday';
+  
+  // Check if within this week
+  const diffDays = Math.ceil((compareDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays > 0 && diffDays <= 7) {
+    return d.toLocaleDateString('en-US', { weekday: 'short' });
+  }
+  
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function getDueDateStatus(date: Date): 'overdue' | 'today' | 'soon' | 'normal' {
+  const d = new Date(date);
+  const today = new Date();
+  
+  // Reset time for comparison
+  today.setHours(0, 0, 0, 0);
+  const compareDate = new Date(d);
+  compareDate.setHours(0, 0, 0, 0);
+  
+  const diffDays = Math.ceil((compareDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  
+  if (diffDays < 0) return 'overdue';
+  if (diffDays === 0) return 'today';
+  if (diffDays <= 2) return 'soon';
+  return 'normal';
+}
+
+const dueDateColors = {
+  overdue: { bg: '#DC2626', text: '#FFF' },
+  today: { bg: '#F97316', text: '#FFF' },
+  soon: { bg: '#EAB308', text: '#000' },
+  normal: { bg: 'transparent', text: 'text.secondary' },
+};
+
 export function TaskCard({ 
   task, 
   onEdit, 
@@ -81,6 +138,9 @@ export function TaskCard({
   };
 
   const priorityConfig = task.priority ? PriorityConfig[task.priority] : null;
+  const dueDateStatus = task.dueDate ? getDueDateStatus(task.dueDate) : null;
+  const dueDateStyle = dueDateStatus ? dueDateColors[dueDateStatus] : null;
+  const assignee = task.assigneeId ? USERS.find(u => u.id === task.assigneeId) : null;
 
   return (
     <Card
@@ -183,23 +243,75 @@ export function TaskCard({
               </Box>
             )}
             
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              {task.dueDate && (
-                <Box
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 0.5,
-                    color: 'text.secondary',
-                  }}
-                >
-                  <CalendarToday sx={{ fontSize: 14 }} />
-                  <Typography variant="caption">
-                    {new Date(task.dueDate).toLocaleDateString()}
-                  </Typography>
-                </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+              {/* Due Date Chip */}
+              {task.dueDate && dueDateStyle && (
+                <Tooltip title={new Date(task.dueDate).toLocaleDateString('en-US', { 
+                  weekday: 'long', 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}>
+                  <Chip
+                    icon={dueDateStatus === 'overdue' ? <Warning sx={{ fontSize: 14 }} /> : <CalendarToday sx={{ fontSize: 14 }} />}
+                    label={formatDueDate(task.dueDate)}
+                    size="small"
+                    sx={{
+                      height: 22,
+                      fontSize: '0.7rem',
+                      fontWeight: 600,
+                      bgcolor: dueDateStatus === 'normal' 
+                        ? alpha('#6B7280', 0.15) 
+                        : alpha(dueDateStyle.bg, 0.9),
+                      color: dueDateStatus === 'normal' ? 'text.secondary' : dueDateStyle.text,
+                      '& .MuiChip-icon': {
+                        color: dueDateStatus === 'normal' ? 'text.secondary' : dueDateStyle.text,
+                      },
+                    }}
+                  />
+                </Tooltip>
               )}
               
+              {/* Checklist Progress */}
+              {task.checklist && task.checklist.length > 0 && (() => {
+                const { completed, total } = countChecklistItems(task.checklist);
+                const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+                const isComplete = completed === total;
+                return (
+                  <Tooltip title={`${completed}/${total} completed`}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 0.5,
+                        minWidth: 60,
+                        color: isComplete ? 'success.main' : 'text.secondary',
+                      }}
+                    >
+                      <CheckCircleOutline sx={{ fontSize: 14 }} />
+                      <Typography variant="caption" fontWeight={500}>
+                        {completed}/{total}
+                      </Typography>
+                      <LinearProgress
+                        variant="determinate"
+                        value={percent}
+                        sx={{
+                          flex: 1,
+                          height: 4,
+                          borderRadius: 2,
+                          minWidth: 24,
+                          bgcolor: alpha(isComplete ? '#22C55E' : '#6B7280', 0.2),
+                          '& .MuiLinearProgress-bar': {
+                            bgcolor: isComplete ? '#22C55E' : '#3B82F6',
+                          },
+                        }}
+                      />
+                    </Box>
+                  </Tooltip>
+                );
+              })()}
+              
+              {/* Comment Count */}
               {commentCount > 0 && (
                 <Tooltip title={unreadMoltbotComments > 0 ? `${unreadMoltbotComments} new from Moltbot` : `${commentCount} comments`}>
                   <Box
@@ -228,6 +340,26 @@ export function TaskCard({
                       {unreadMoltbotComments > 0 ? unreadMoltbotComments : commentCount}
                     </Typography>
                   </Box>
+                </Tooltip>
+              )}
+              
+              {/* Spacer to push assignee to right */}
+              <Box sx={{ flex: 1 }} />
+              
+              {/* Assignee Avatar */}
+              {assignee && (
+                <Tooltip title={`Assigned to ${assignee.name}`}>
+                  <Avatar
+                    sx={{
+                      width: 24,
+                      height: 24,
+                      bgcolor: assignee.color,
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {assignee.avatar || assignee.name[0]}
+                  </Avatar>
                 </Tooltip>
               )}
             </Box>
