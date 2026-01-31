@@ -71,12 +71,13 @@ export async function GET(request: NextRequest) {
     const tasks = await db
       .collection<Task>('tasks')
       .find({ id: { $in: taskIds } })
-      .project({ id: 1, title: 1 })
+      .project<{ id: string; title: string }>({ id: 1, title: 1 })
       .toArray();
     
-    const taskTitleMap = Object.fromEntries(
-      tasks.map(t => [t.id, t.title])
-    );
+    const taskTitleMap: Record<string, string> = {};
+    for (const t of tasks) {
+      taskTitleMap[t.id] = t.title;
+    }
 
     // Combine and sort by timestamp
     const feed = [
