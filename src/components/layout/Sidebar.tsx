@@ -430,12 +430,49 @@ export function Sidebar({ width }: SidebarProps) {
         {/* Spacer */}
         <Box sx={{ flex: 1 }} />
 
+        {/* Footer Links */}
+        <Box
+          sx={{
+            px: 2,
+            pb: 1,
+            display: 'flex',
+            gap: 2,
+            justifyContent: 'center',
+            borderTop: '1px solid',
+            borderColor: alpha('#ffffff', 0.1),
+            pt: 1.5,
+          }}
+        >
+          <Typography
+            variant="caption"
+            onClick={() => router.push('/privacy')}
+            sx={{
+              color: 'text.secondary',
+              cursor: 'pointer',
+              '&:hover': { color: 'primary.main', textDecoration: 'underline' },
+            }}
+          >
+            Privacy
+          </Typography>
+          <Typography variant="caption" color="text.secondary">•</Typography>
+          <Typography
+            variant="caption"
+            onClick={() => router.push('/terms')}
+            sx={{
+              color: 'text.secondary',
+              cursor: 'pointer',
+              '&:hover': { color: 'primary.main', textDecoration: 'underline' },
+            }}
+          >
+            Terms
+          </Typography>
+        </Box>
+
         {/* Chat Button - Fixed at bottom */}
         <Box
           sx={{
             p: 2,
-            borderTop: '1px solid',
-            borderColor: alpha('#ffffff', 0.1),
+            pt: 1,
           }}
         >
           <Button
