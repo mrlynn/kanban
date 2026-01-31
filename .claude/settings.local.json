@@ -3,7 +3,15 @@
     "allow": [
       "WebFetch(domain:docs.molt.bot)",
       "WebFetch(domain:github.com)",
-      "Bash(clawdbot gateway:*)"
+      "Bash(clawdbot gateway:*)",
+      "Bash(clawdbot channel list:*)",
+      "Bash(mongosh:*)",
+      "Bash(clawdbot logs:*)",
+      "Bash(npm install:*)",
+      "Bash(clawdbot --version:*)",
+      "Bash(clawdbot config get:*)",
+      "WebFetch(domain:docs.openclaw.ai)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }
