@@ -11,7 +11,6 @@ import {
   ListItemText,
   IconButton,
   Avatar,
-  Badge,
   Divider,
   Collapse,
   Tooltip,
@@ -30,7 +29,6 @@ import {
   Timeline,
   ExpandLess,
   ExpandMore,
-  Chat,
   SwapHoriz,
   Comment,
   PriorityHigh,
@@ -39,7 +37,6 @@ import {
 } from '@mui/icons-material';
 import { useRouter, usePathname } from 'next/navigation';
 import { Board, Actor } from '@/types/kanban';
-import { ChatPanel } from './ChatPanel';
 
 interface SidebarProps {
   width: number;
@@ -121,11 +118,6 @@ export function Sidebar({ width }: SidebarProps) {
   const [activityExpanded, setActivityExpanded] = useState(true);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loadingActivity, setLoadingActivity] = useState(false);
-  
-  // Chat panel state
-  const [chatOpen, setChatOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const lastCheckedRef = useState<string | null>(null);
 
   // Get current board ID from pathname
   const currentBoardId = pathname?.startsWith('/board/') 
@@ -171,42 +163,6 @@ export function Sidebar({ width }: SidebarProps) {
     const interval = setInterval(fetchActivities, 30000);
     return () => clearInterval(interval);
   }, [fetchActivities]);
-
-  // Poll for unread messages when chat is closed
-  useEffect(() => {
-    if (chatOpen) {
-      setUnreadCount(0);
-      return;
-    }
-
-    const pollUnread = async () => {
-      try {
-        const res = await fetch('/api/chat?limit=10');
-        if (res.ok) {
-          const data = await res.json();
-          const messages = data.messages || [];
-          // Count moltbot messages we haven't seen
-          const newMoltbotMessages = messages.filter(
-            (m: { author: string; createdAt: string }) => 
-              m.author === 'moltbot' && 
-              lastCheckedRef[0] && 
-              new Date(m.createdAt) > new Date(lastCheckedRef[0])
-          );
-          if (newMoltbotMessages.length > 0) {
-            setUnreadCount(prev => prev + newMoltbotMessages.length);
-          }
-          if (messages.length > 0) {
-            lastCheckedRef[0] = messages[messages.length - 1].createdAt;
-          }
-        }
-      } catch (error) {
-        console.error('Failed to poll messages:', error);
-      }
-    };
-
-    const interval = setInterval(pollUnread, 15000);
-    return () => clearInterval(interval);
-  }, [chatOpen]);
 
   // Create board
   const handleCreateBoard = async () => {
@@ -468,43 +424,6 @@ export function Sidebar({ width }: SidebarProps) {
           </Typography>
         </Box>
 
-        {/* Chat Button - Fixed at bottom */}
-        <Box
-          sx={{
-            p: 2,
-            pt: 1,
-          }}
-        >
-          <Button
-            fullWidth
-            variant="contained"
-            startIcon={
-              <Badge badgeContent={unreadCount} color="error" max={99}>
-                <Avatar sx={{ width: 28, height: 28, bgcolor: 'transparent', fontSize: '1rem' }}>
-                  🔥
-                </Avatar>
-              </Badge>
-            }
-            onClick={() => setChatOpen(true)}
-            sx={{
-              bgcolor: alpha('#F97316', 0.15),
-              color: '#F97316',
-              justifyContent: 'flex-start',
-              py: 1.5,
-              '&:hover': { bgcolor: alpha('#F97316', 0.25) },
-            }}
-          >
-            <Box sx={{ textAlign: 'left', ml: 1 }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
-                Chat with Moltbot
-              </Typography>
-              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 400 }}>
-                Ask anything
-              </Typography>
-            </Box>
-          </Button>
-        </Box>
-
         {/* Create Board Dialog */}
         <Dialog open={createDialogOpen} onClose={() => setCreateDialogOpen(false)} maxWidth="xs" fullWidth>
           <DialogTitle>Create New Board</DialogTitle>
@@ -527,12 +446,6 @@ export function Sidebar({ width }: SidebarProps) {
           </DialogActions>
         </Dialog>
       </Box>
-
-      {/* Chat Slide-out Panel */}
-      <ChatPanel 
-        open={chatOpen} 
-        onClose={() => setChatOpen(false)} 
-      />
     </>
   );
 }
