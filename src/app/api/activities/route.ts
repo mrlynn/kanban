@@ -63,10 +63,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Get task titles for context
-    const taskIds = [...new Set([
-      ...activities.map(a => a.taskId),
-      ...comments.map(c => c.taskId),
-    ])];
+    const taskIdSet = new Set<string>();
+    activities.forEach(a => taskIdSet.add(a.taskId));
+    comments.forEach(c => taskIdSet.add(c.taskId));
+    const taskIds = Array.from(taskIdSet);
     
     const tasks = await db
       .collection<Task>('tasks')
