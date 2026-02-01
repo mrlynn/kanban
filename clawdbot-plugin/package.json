@@ -1,17 +1,48 @@
 {
-  "name": "moltboard",
+  "name": "@moltboard/clawdbot-plugin",
   "version": "1.0.0",
-  "description": "Clawdbot channel plugin for Moltboard",
+  "description": "Clawdbot channel plugin for Moltboard task management",
   "type": "module",
-  "main": "index.ts",
-  "types": "index.ts",
-  "scripts": {
-    "typecheck": "tsc --noEmit",
-    "lint": "eslint src/**/*.ts"
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   },
+  "files": [
+    "dist",
+    "clawdbot.plugin.json",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build",
+    "typecheck": "tsc --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mrlynn/moltboard.git",
+    "directory": "clawdbot-plugin"
+  },
+  "keywords": [
+    "clawdbot",
+    "moltboard",
+    "kanban",
+    "task-management",
+    "channel-plugin"
+  ],
+  "author": "Michael Lynn <michael@mlynn.org>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mrlynn/moltboard/issues"
+  },
+  "homepage": "https://github.com/mrlynn/moltboard#readme",
   "clawdbot": {
     "extensions": [
-      "./index.ts"
+      "./dist/index.js"
     ],
     "channel": {
       "id": "moltboard",
@@ -29,13 +60,16 @@
     }
   },
   "dependencies": {
-    "zod": "^3.25.76"
+    "zod": "^3.24.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "typescript": "^5.0.0"
   },
   "peerDependencies": {
-    "clawdbot": "*"
+    "clawdbot": ">=2024.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

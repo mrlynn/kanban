@@ -254,13 +254,23 @@ export async function executeCommand(
     opts
   );
 
-  const data = await response.json();
+  const data = await response.json() as {
+    success: boolean;
+    command?: { type: string; description: string; confidence: number };
+    result?: { action: string; message: string };
+    error?: string;
+  };
   
   if (!response.ok && !data.command) {
     throw new Error(data.error || `Command API error: ${response.status}`);
   }
 
-  return data;
+  return data as {
+    success: boolean;
+    command: { type: string; description: string; confidence: number };
+    result?: { action: string; message: string };
+    error?: string;
+  };
 }
 
 /**

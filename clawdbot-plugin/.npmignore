@@ -1,0 +1,12 @@
+# Source files (dist is included)
+src/
+types/
+index.ts
+
+# Config
+tsconfig.json
+.gitignore
+
+# Dev files
+*.log
+.DS_Store

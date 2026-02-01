@@ -1,35 +1,40 @@
 {
   "id": "moltboard",
   "name": "Moltboard",
-  "description": "Moltboard task management channel",
+  "description": "Moltboard task management channel for Clawdbot",
   "version": "1.0.0",
   "channels": ["moltboard"],
+  "entry": "./dist/index.js",
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
     "properties": {
       "enabled": {
         "type": "boolean",
-        "default": true
+        "default": true,
+        "description": "Enable the Moltboard channel"
       },
       "apiUrl": {
         "type": "string",
+        "default": "https://kanban.mlynn.org",
         "description": "Moltboard API base URL"
       },
       "apiKey": {
         "type": "string",
-        "description": "API key for moltbot authentication"
+        "description": "API key for authentication (from Moltboard Settings)"
       },
       "pollIntervalMs": {
         "type": "number",
-        "default": 5000
+        "default": 5000,
+        "description": "Polling interval in milliseconds"
       },
       "defaultBoardId": {
         "type": "string",
-        "description": "Default board for routing"
+        "description": "Default board ID for message routing"
       },
       "accounts": {
         "type": "object",
+        "description": "Multiple account configurations",
         "additionalProperties": {
           "type": "object",
           "properties": {
@@ -41,12 +46,14 @@
           }
         }
       }
-    }
+    },
+    "required": ["apiKey"]
   },
   "uiHints": {
     "apiKey": {
       "label": "API Key",
-      "sensitive": true
+      "sensitive": true,
+      "placeholder": "moltboard_sk_..."
     },
     "apiUrl": {
       "label": "Moltboard API URL",
@@ -57,7 +64,8 @@
       "placeholder": "5000"
     },
     "defaultBoardId": {
-      "label": "Default Board ID"
+      "label": "Default Board ID",
+      "placeholder": "board_..."
     }
   }
 }
