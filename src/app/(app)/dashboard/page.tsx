@@ -126,7 +126,7 @@ export default function DashboardPage() {
       const res = await fetch('/api/commands', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command: cmd }),
+        body: JSON.stringify({ text: cmd }),
       });
       
       const data = await res.json();
