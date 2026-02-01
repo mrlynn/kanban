@@ -225,6 +225,62 @@ export async function fetchBoardDetails(
 }
 
 /**
+ * Execute a natural language command
+ */
+export async function executeCommand(
+  account: ResolvedMoltboardAccount,
+  text: string,
+  boardId?: string,
+  opts: FetchOptions = {}
+): Promise<{
+  success: boolean;
+  command: { type: string; description: string; confidence: number };
+  result?: { action: string; message: string };
+  error?: string;
+}> {
+  const response = await fetchWithTimeout(
+    `${account.apiUrl}/api/commands`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": account.apiKey,
+      },
+      body: JSON.stringify({
+        text,
+        boardId: boardId || account.defaultBoardId,
+      }),
+    },
+    opts
+  );
+
+  const data = await response.json();
+  
+  if (!response.ok && !data.command) {
+    throw new Error(data.error || `Command API error: ${response.status}`);
+  }
+
+  return data;
+}
+
+/**
+ * Check if text looks like a command
+ */
+export function looksLikeCommand(text: string): boolean {
+  const lowered = text.toLowerCase().trim();
+  const commandStarters = [
+    'create', 'add', 'new', 'task:',
+    'move', 'set', 'change',
+    'complete', 'finish', 'close', 'mark',
+    'archive',
+    'show', 'list', 'what', 'find', 'search',
+    'priority',
+  ];
+  
+  return commandStarters.some(starter => lowered.startsWith(starter));
+}
+
+/**
  * Probe Moltboard API health
  */
 export async function probeMoltboard(
