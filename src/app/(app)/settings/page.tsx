@@ -41,6 +41,10 @@ import {
   CheckCircle,
   Settings,
   Code,
+  GitHub,
+  Link as LinkIcon,
+  Sync,
+  AutoFixHigh,
 } from '@mui/icons-material';
 
 interface Tenant {
@@ -72,6 +76,28 @@ interface ApiKey {
   usageCount: number;
 }
 
+interface Board {
+  id: string;
+  name: string;
+}
+
+interface Project {
+  id: string;
+  boardId: string;
+  name: string;
+  color: string;
+  github?: {
+    owner: string;
+    repo: string;
+    webhookSecret?: string;
+    syncEnabled: boolean;
+    autoLinkPRs: boolean;
+    autoMoveTasks: boolean;
+    createTasksFromIssues: boolean;
+  };
+  board?: { id: string; name: string };
+}
+
 const SCOPE_LABELS: Record<string, string> = {
   'chat:read': 'Read chat messages',
   'chat:write': 'Send chat messages',
@@ -86,8 +112,22 @@ const DEFAULT_SCOPES = ['chat:read', 'chat:write', 'tasks:read', 'boards:read'];
 export default function SettingsPage() {
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [boards, setBoards] = useState<Board[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // GitHub project dialog
+  const [projectDialogOpen, setProjectDialogOpen] = useState(false);
+  const [projectName, setProjectName] = useState('');
+  const [projectBoardId, setProjectBoardId] = useState('');
+  const [projectGithubOwner, setProjectGithubOwner] = useState('');
+  const [projectGithubRepo, setProjectGithubRepo] = useState('');
+  const [projectAutoLink, setProjectAutoLink] = useState(true);
+  const [projectAutoMove, setProjectAutoMove] = useState(true);
+  const [projectCreateFromIssues, setProjectCreateFromIssues] = useState(false);
+  const [creatingProject, setCreatingProject] = useState(false);
+  const [newWebhookSecret, setNewWebhookSecret] = useState<string | null>(null);
   
   // Create key dialog
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -106,13 +146,15 @@ export default function SettingsPage() {
     severity: 'success',
   });
 
-  // Fetch tenant info and API keys
+  // Fetch tenant info, API keys, projects, and boards
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [tenantRes, keysRes] = await Promise.all([
+      const [tenantRes, keysRes, projectsRes, boardsRes] = await Promise.all([
         fetch('/api/tenant'),
         fetch('/api/tenant/api-keys'),
+        fetch('/api/projects'),
+        fetch('/api/boards'),
       ]);
       
       if (tenantRes.ok) {
@@ -125,6 +167,16 @@ export default function SettingsPage() {
       if (keysRes.ok) {
         const data = await keysRes.json();
         setApiKeys(data.keys || []);
+      }
+      
+      if (projectsRes.ok) {
+        const data = await projectsRes.json();
+        setProjects(data || []);
+      }
+      
+      if (boardsRes.ok) {
+        const data = await boardsRes.json();
+        setBoards(data || []);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load settings');
@@ -212,6 +264,89 @@ export default function SettingsPage() {
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     setSnackbar({ open: true, message: `${label} copied to clipboard`, severity: 'success' });
+  };
+
+  // Create new project with GitHub integration
+  const handleCreateProject = async () => {
+    if (!projectName.trim() || !projectBoardId || !projectGithubOwner || !projectGithubRepo || creatingProject) return;
+    
+    setCreatingProject(true);
+    try {
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: projectName.trim(),
+          boardId: projectBoardId,
+          github: {
+            owner: projectGithubOwner.trim(),
+            repo: projectGithubRepo.trim(),
+            syncEnabled: true,
+            autoLinkPRs: projectAutoLink,
+            autoMoveTasks: projectAutoMove,
+            createTasksFromIssues: projectCreateFromIssues,
+          },
+        }),
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setNewWebhookSecret(data.github?.webhookSecret || null);
+        setProjects(prev => [data, ...prev]);
+        // Keep dialog open to show webhook secret
+        if (!data.github?.webhookSecret) {
+          resetProjectDialog();
+        }
+      } else {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to create project');
+      }
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: err instanceof Error ? err.message : 'Failed to create project',
+        severity: 'error',
+      });
+    } finally {
+      setCreatingProject(false);
+    }
+  };
+
+  // Delete project
+  const handleDeleteProject = async (projectId: string) => {
+    if (!confirm('Are you sure you want to delete this integration? This will not delete the board.')) return;
+    
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: 'DELETE',
+      });
+      
+      if (res.ok) {
+        setProjects(prev => prev.filter(p => p.id !== projectId));
+        setSnackbar({ open: true, message: 'Integration removed', severity: 'success' });
+      } else {
+        throw new Error('Failed to delete project');
+      }
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: err instanceof Error ? err.message : 'Failed to delete project',
+        severity: 'error',
+      });
+    }
+  };
+
+  // Reset project dialog
+  const resetProjectDialog = () => {
+    setProjectDialogOpen(false);
+    setProjectName('');
+    setProjectBoardId('');
+    setProjectGithubOwner('');
+    setProjectGithubRepo('');
+    setProjectAutoLink(true);
+    setProjectAutoMove(true);
+    setProjectCreateFromIssues(false);
+    setNewWebhookSecret(null);
   };
 
   // Toggle scope
@@ -467,6 +602,118 @@ export default function SettingsPage() {
             </Alert>
           </Paper>
         </Grid>
+
+        {/* GitHub Integration */}
+        <Grid item xs={12}>
+          <Paper sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <GitHub sx={{ color: '#ffffff' }} />
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  GitHub Integration
+                </Typography>
+              </Box>
+              <Button
+                startIcon={<Add />}
+                variant="contained"
+                size="small"
+                onClick={() => setProjectDialogOpen(true)}
+              >
+                Connect Repo
+              </Button>
+            </Box>
+            
+            <Typography color="text.secondary" sx={{ mb: 3 }}>
+              Connect your GitHub repositories to automatically link PRs and issues to tasks.
+            </Typography>
+            
+            {projects.length === 0 ? (
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <GitHub sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
+                <Typography color="text.secondary">
+                  No GitHub integrations yet
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Connect a repo to auto-link PRs to tasks
+                </Typography>
+              </Box>
+            ) : (
+              <List disablePadding>
+                {projects.filter(p => p.github).map((project) => (
+                  <ListItem
+                    key={project.id}
+                    sx={{
+                      bgcolor: alpha('#ffffff', 0.02),
+                      borderRadius: 1,
+                      mb: 1,
+                      border: '1px solid',
+                      borderColor: alpha('#ffffff', 0.1),
+                    }}
+                  >
+                    <ListItemText
+                      primary={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography fontWeight={600}>{project.name}</Typography>
+                          <Chip
+                            size="small"
+                            label={`${project.github?.owner}/${project.github?.repo}`}
+                            sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}
+                          />
+                        </Box>
+                      }
+                      secondary={
+                        <Box component="span" sx={{ display: 'flex', gap: 2, mt: 1 }}>
+                          {project.github?.autoLinkPRs && (
+                            <Chip
+                              icon={<LinkIcon sx={{ fontSize: 14 }} />}
+                              label="Auto-link PRs"
+                              size="small"
+                              variant="outlined"
+                              sx={{ height: 24 }}
+                            />
+                          )}
+                          {project.github?.autoMoveTasks && (
+                            <Chip
+                              icon={<Sync sx={{ fontSize: 14 }} />}
+                              label="Auto-move on merge"
+                              size="small"
+                              variant="outlined"
+                              sx={{ height: 24 }}
+                            />
+                          )}
+                          {project.github?.createTasksFromIssues && (
+                            <Chip
+                              icon={<AutoFixHigh sx={{ fontSize: 14 }} />}
+                              label="Issues → Tasks"
+                              size="small"
+                              variant="outlined"
+                              sx={{ height: 24 }}
+                            />
+                          )}
+                          <Typography variant="caption" color="text.secondary">
+                            Board: {project.board?.name || project.boardId}
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                    <ListItemSecondaryAction>
+                      <Tooltip title="Remove integration">
+                        <IconButton
+                          edge="end"
+                          size="small"
+                          onClick={() => handleDeleteProject(project.id)}
+                          sx={{ color: 'error.main' }}
+                        >
+                          <Delete fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </ListItemSecondaryAction>
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </Paper>
+        </Grid>
       </Grid>
 
       {/* Create Key Dialog */}
@@ -568,6 +815,225 @@ export default function SettingsPage() {
           >
             Done
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* GitHub Project Dialog */}
+      <Dialog open={projectDialogOpen} onClose={resetProjectDialog} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <GitHub />
+          {newWebhookSecret ? 'Integration Created!' : 'Connect GitHub Repository'}
+        </DialogTitle>
+        <DialogContent>
+          {newWebhookSecret ? (
+            <>
+              <Alert severity="success" sx={{ mb: 2 }}>
+                GitHub integration created! Now add the webhook to your repository.
+              </Alert>
+              
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                1. Go to your GitHub repo → Settings → Webhooks → Add webhook
+              </Typography>
+              
+              <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
+                2. Payload URL:
+              </Typography>
+              <Box
+                sx={{
+                  bgcolor: '#1a1a1a',
+                  borderRadius: 1,
+                  p: 1.5,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                }}
+              >
+                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.8rem', flex: 1 }}>
+                  https://kanban.mlynn.org/api/webhooks/github
+                </Typography>
+                <IconButton
+                  size="small"
+                  onClick={() => copyToClipboard('https://kanban.mlynn.org/api/webhooks/github', 'URL')}
+                >
+                  <ContentCopy fontSize="small" />
+                </IconButton>
+              </Box>
+              
+              <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
+                3. Secret:
+              </Typography>
+              <Box
+                sx={{
+                  bgcolor: '#1a1a1a',
+                  borderRadius: 1,
+                  p: 1.5,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                }}
+              >
+                <Typography sx={{ fontFamily: 'monospace', fontSize: '0.7rem', flex: 1, wordBreak: 'break-all' }}>
+                  {newWebhookSecret}
+                </Typography>
+                <IconButton
+                  size="small"
+                  onClick={() => copyToClipboard(newWebhookSecret, 'Secret')}
+                >
+                  <ContentCopy fontSize="small" />
+                </IconButton>
+              </Box>
+              
+              <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
+                4. Select events:
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                • Pull requests<br />
+                • Issues (if you enabled "Create tasks from issues")
+              </Typography>
+              
+              <Alert severity="warning" sx={{ mt: 2 }}>
+                Save this secret now — you won't be able to see it again!
+              </Alert>
+            </>
+          ) : (
+            <>
+              <TextField
+                fullWidth
+                label="Project Name"
+                placeholder="e.g., NetPad"
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                sx={{ mt: 1, mb: 2 }}
+              />
+              
+              <TextField
+                select
+                fullWidth
+                label="Board"
+                value={projectBoardId}
+                onChange={(e) => setProjectBoardId(e.target.value)}
+                sx={{ mb: 2 }}
+                SelectProps={{ native: true }}
+              >
+                <option value="">Select a board...</option>
+                {boards.map((board) => (
+                  <option key={board.id} value={board.id}>
+                    {board.name}
+                  </option>
+                ))}
+              </TextField>
+              
+              <Divider sx={{ my: 2 }} />
+              
+              <Typography variant="subtitle2" sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <GitHub fontSize="small" />
+                GitHub Repository
+              </Typography>
+              
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <TextField
+                    fullWidth
+                    label="Owner"
+                    placeholder="mrlynn"
+                    value={projectGithubOwner}
+                    onChange={(e) => setProjectGithubOwner(e.target.value)}
+                    size="small"
+                  />
+                </Grid>
+                <Grid item xs={6}>
+                  <TextField
+                    fullWidth
+                    label="Repository"
+                    placeholder="netpad-v3"
+                    value={projectGithubRepo}
+                    onChange={(e) => setProjectGithubRepo(e.target.value)}
+                    size="small"
+                  />
+                </Grid>
+              </Grid>
+              
+              <Divider sx={{ my: 2 }} />
+              
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                Automation Settings
+              </Typography>
+              
+              <FormGroup>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={projectAutoLink}
+                      onChange={(e) => setProjectAutoLink(e.target.checked)}
+                      size="small"
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2">Auto-link PRs to tasks</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        PRs mentioning task_xxx in title/body get linked
+                      </Typography>
+                    </Box>
+                  }
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={projectAutoMove}
+                      onChange={(e) => setProjectAutoMove(e.target.checked)}
+                      size="small"
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2">Auto-move tasks when PRs merge</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Linked tasks move to Done when PR is merged
+                      </Typography>
+                    </Box>
+                  }
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={projectCreateFromIssues}
+                      onChange={(e) => setProjectCreateFromIssues(e.target.checked)}
+                      size="small"
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2">Create tasks from GitHub issues</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        New issues automatically become tasks in To Do
+                      </Typography>
+                    </Box>
+                  }
+                />
+              </FormGroup>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions>
+          {newWebhookSecret ? (
+            <Button variant="contained" onClick={resetProjectDialog}>
+              Done
+            </Button>
+          ) : (
+            <>
+              <Button onClick={resetProjectDialog} color="inherit">
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreateProject}
+                variant="contained"
+                disabled={!projectName.trim() || !projectBoardId || !projectGithubOwner || !projectGithubRepo || creatingProject}
+              >
+                {creatingProject ? 'Creating...' : 'Connect'}
+              </Button>
+            </>
+          )}
         </DialogActions>
       </Dialog>
 
