@@ -41,6 +41,7 @@ import {
   Send,
   KeyboardArrowUp,
   KeyboardArrowDown,
+  HelpOutline,
 } from '@mui/icons-material';
 import {
   BarChart,
@@ -58,6 +59,7 @@ import {
   Area,
 } from 'recharts';
 import Link from 'next/link';
+import { useHelp } from '@/contexts/HelpContext';
 
 interface MetricsData {
   velocity: {
@@ -102,6 +104,7 @@ const PRIORITY_LABELS: Record<string, string> = {
 
 export default function DashboardPage() {
   const theme = useTheme();
+  const { openHelp } = useHelp();
   const [metrics, setMetrics] = useState<MetricsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -119,6 +122,14 @@ export default function DashboardPage() {
   const executeCommand = async (cmd: string) => {
     if (!cmd.trim() || executing) return;
     
+    // Check for help commands
+    const helpCommands = ['?', 'help', '/help', '/?'];
+    if (helpCommands.includes(cmd.trim().toLowerCase())) {
+      setCommand('');
+      openHelp();
+      return;
+    }
+    
     setExecuting(true);
     setCommandResult(null);
     
@@ -132,7 +143,7 @@ export default function DashboardPage() {
       const data = await res.json();
       
       if (res.ok) {
-        setCommandResult({ message: data.message || 'Done', success: true });
+        setCommandResult({ message: data.result?.message || data.message || 'Done', success: true });
         setCommandHistory(prev => [cmd, ...prev.slice(0, 19)]);
         setCommand('');
         setHistoryIndex(-1);
@@ -193,6 +204,20 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchMetrics();
   }, [fetchMetrics]);
+
+  // Global keyboard shortcut: Cmd+K to focus command bar
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowCommandBar(true);
+        commandInputRef.current?.focus();
+      }
+    };
+    
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
 
   if (loading && !metrics) {
     return (
@@ -284,9 +309,16 @@ export default function DashboardPage() {
             <Typography variant="subtitle2" color="primary.main">
               Command Center
             </Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
-              Press Enter to execute • ↑↓ for history
-            </Typography>
+            <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="caption" color="text.secondary">
+                ⌘K focus • Enter execute • ↑↓ history
+              </Typography>
+              <Tooltip title="Help (? or ⌘/)">
+                <IconButton size="small" onClick={openHelp}>
+                  <HelpOutline fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
           </Box>
           
           <TextField
@@ -337,10 +369,10 @@ export default function DashboardPage() {
               Examples:
             </Typography>
             {[
+              '?',
               'show P1 tasks',
               'move "task name" to done',
               'create task: New feature, p2',
-              'complete demo video task',
             ].map((example) => (
               <Chip
                 key={example}
