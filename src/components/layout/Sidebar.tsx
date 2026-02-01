@@ -36,6 +36,7 @@ import {
   Archive,
   Logout,
   Settings,
+  Speed,
 } from '@mui/icons-material';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
@@ -257,8 +258,37 @@ export function Sidebar({ width, onNavigate }: SidebarProps) {
           </Box>
         </Box>
 
-        {/* Boards Section */}
+        {/* Control Center Link */}
         <Box sx={{ px: 1, pt: 2 }}>
+          <ListItemButton
+            onClick={() => navigateTo('/dashboard')}
+            selected={pathname === '/dashboard'}
+            sx={{
+              borderRadius: 1,
+              mb: 1,
+              bgcolor: pathname === '/dashboard' ? alpha('#00ED64', 0.15) : alpha('#F97316', 0.08),
+              '&:hover': { bgcolor: pathname === '/dashboard' ? alpha('#00ED64', 0.2) : alpha('#F97316', 0.15) },
+              '&.Mui-selected': {
+                bgcolor: alpha('#00ED64', 0.15),
+                '&:hover': { bgcolor: alpha('#00ED64', 0.2) },
+              },
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: 36 }}>
+              <Speed fontSize="small" sx={{ color: pathname === '/dashboard' ? 'primary.main' : '#F97316' }} />
+            </ListItemIcon>
+            <ListItemText
+              primary="Control Center"
+              primaryTypographyProps={{
+                variant: 'body2',
+                fontWeight: 600,
+              }}
+            />
+          </ListItemButton>
+        </Box>
+
+        {/* Boards Section */}
+        <Box sx={{ px: 1, pt: 1 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1, mb: 1 }}>
             <Typography variant="overline" color="text.secondary" sx={{ fontWeight: 600, letterSpacing: 1 }}>
               Boards
