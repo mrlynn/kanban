@@ -81,6 +81,42 @@ interface Board {
   name: string;
 }
 
+interface Automation {
+  id: string;
+  name: string;
+  description?: string;
+  enabled: boolean;
+  trigger: string;
+  action: string;
+  actionParams?: Record<string, unknown>;
+  triggerCount: number;
+  createdAt: string;
+  project?: { name: string };
+}
+
+const TRIGGER_LABELS: Record<string, string> = {
+  github_pr_opened: 'PR Opened',
+  github_pr_merged: 'PR Merged',
+  github_pr_closed: 'PR Closed',
+  github_issue_opened: 'Issue Opened',
+  github_issue_closed: 'Issue Closed',
+  task_created: 'Task Created',
+  task_moved: 'Task Moved',
+  task_completed: 'Task Completed',
+  due_date_approaching: 'Due Date Approaching',
+  due_date_passed: 'Due Date Passed',
+};
+
+const ACTION_LABELS: Record<string, string> = {
+  create_task: 'Create Task',
+  move_task: 'Move Task',
+  update_task: 'Update Task',
+  add_label: 'Add Label',
+  add_comment: 'Add Comment',
+  notify: 'Send Notification',
+  archive_task: 'Archive Task',
+};
+
 interface Project {
   id: string;
   boardId: string;
@@ -114,8 +150,17 @@ export default function SettingsPage() {
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [boards, setBoards] = useState<Board[]>([]);
+  const [automations, setAutomations] = useState<Automation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Automation dialog
+  const [automationDialogOpen, setAutomationDialogOpen] = useState(false);
+  const [automationName, setAutomationName] = useState('');
+  const [automationDescription, setAutomationDescription] = useState('');
+  const [automationTrigger, setAutomationTrigger] = useState('');
+  const [automationAction, setAutomationAction] = useState('');
+  const [creatingAutomation, setCreatingAutomation] = useState(false);
   
   // GitHub project dialog
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
@@ -146,15 +191,16 @@ export default function SettingsPage() {
     severity: 'success',
   });
 
-  // Fetch tenant info, API keys, projects, and boards
+  // Fetch tenant info, API keys, projects, boards, and automations
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [tenantRes, keysRes, projectsRes, boardsRes] = await Promise.all([
+      const [tenantRes, keysRes, projectsRes, boardsRes, automationsRes] = await Promise.all([
         fetch('/api/tenant'),
         fetch('/api/tenant/api-keys'),
         fetch('/api/projects'),
         fetch('/api/boards'),
+        fetch('/api/automations?includeDisabled=true'),
       ]);
       
       if (tenantRes.ok) {
@@ -177,6 +223,11 @@ export default function SettingsPage() {
       if (boardsRes.ok) {
         const data = await boardsRes.json();
         setBoards(data || []);
+      }
+      
+      if (automationsRes.ok) {
+        const data = await automationsRes.json();
+        setAutomations(data || []);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load settings');
@@ -356,6 +407,100 @@ export default function SettingsPage() {
         ? prev.filter(s => s !== scope)
         : [...prev, scope]
     );
+  };
+
+  // Create automation
+  const handleCreateAutomation = async () => {
+    if (!automationName.trim() || !automationTrigger || !automationAction || creatingAutomation) return;
+    
+    setCreatingAutomation(true);
+    try {
+      const res = await fetch('/api/automations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: automationName.trim(),
+          description: automationDescription.trim() || undefined,
+          trigger: automationTrigger,
+          action: automationAction,
+          actionParams: {},
+        }),
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setAutomations(prev => [data, ...prev]);
+        resetAutomationDialog();
+        setSnackbar({ open: true, message: 'Automation created', severity: 'success' });
+      } else {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to create automation');
+      }
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: err instanceof Error ? err.message : 'Failed to create automation',
+        severity: 'error',
+      });
+    } finally {
+      setCreatingAutomation(false);
+    }
+  };
+
+  // Toggle automation enabled
+  const handleToggleAutomation = async (automationId: string, enabled: boolean) => {
+    try {
+      const res = await fetch(`/api/automations?id=${automationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      });
+      
+      if (res.ok) {
+        setAutomations(prev =>
+          prev.map(a => (a.id === automationId ? { ...a, enabled } : a))
+        );
+      }
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: 'Failed to update automation',
+        severity: 'error',
+      });
+    }
+  };
+
+  // Delete automation
+  const handleDeleteAutomation = async (automationId: string) => {
+    if (!confirm('Are you sure you want to delete this automation?')) return;
+    
+    try {
+      const res = await fetch(`/api/automations?id=${automationId}`, {
+        method: 'DELETE',
+      });
+      
+      if (res.ok) {
+        setAutomations(prev => prev.filter(a => a.id !== automationId));
+        setSnackbar({ open: true, message: 'Automation deleted', severity: 'success' });
+      } else {
+        throw new Error('Failed to delete automation');
+      }
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: err instanceof Error ? err.message : 'Failed to delete automation',
+        severity: 'error',
+      });
+    }
+  };
+
+  // Reset automation dialog
+  const resetAutomationDialog = () => {
+    setAutomationDialogOpen(false);
+    setAutomationName('');
+    setAutomationDescription('');
+    setAutomationTrigger('');
+    setAutomationAction('');
   };
 
   // Usage percentage
@@ -714,6 +859,113 @@ export default function SettingsPage() {
             )}
           </Paper>
         </Grid>
+
+        {/* Automations */}
+        <Grid item xs={12}>
+          <Paper sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <AutoFixHigh sx={{ color: 'warning.main' }} />
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  Automations
+                </Typography>
+              </Box>
+              <Button
+                startIcon={<Add />}
+                variant="contained"
+                size="small"
+                onClick={() => setAutomationDialogOpen(true)}
+              >
+                New Rule
+              </Button>
+            </Box>
+            
+            <Typography color="text.secondary" sx={{ mb: 3 }}>
+              Create custom automation rules to streamline your workflow.
+            </Typography>
+            
+            {automations.length === 0 ? (
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <AutoFixHigh sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
+                <Typography color="text.secondary">
+                  No automations yet
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Create rules to automate task management
+                </Typography>
+              </Box>
+            ) : (
+              <List disablePadding>
+                {automations.map((automation) => (
+                  <ListItem
+                    key={automation.id}
+                    sx={{
+                      bgcolor: alpha('#ffffff', 0.02),
+                      borderRadius: 1,
+                      mb: 1,
+                      border: '1px solid',
+                      borderColor: automation.enabled 
+                        ? alpha('#ffffff', 0.1) 
+                        : alpha('#ffffff', 0.05),
+                      opacity: automation.enabled ? 1 : 0.6,
+                    }}
+                  >
+                    <ListItemText
+                      primary={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography fontWeight={600}>{automation.name}</Typography>
+                          {!automation.enabled && (
+                            <Chip label="Disabled" size="small" sx={{ height: 20, fontSize: '0.7rem' }} />
+                          )}
+                        </Box>
+                      }
+                      secondary={
+                        <Box component="span" sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 0.5 }}>
+                          <Typography variant="body2" component="span">
+                            When <Chip label={TRIGGER_LABELS[automation.trigger] || automation.trigger} size="small" sx={{ height: 20, fontSize: '0.7rem' }} />
+                            {' → '}
+                            <Chip label={ACTION_LABELS[automation.action] || automation.action} size="small" sx={{ height: 20, fontSize: '0.7rem' }} />
+                          </Typography>
+                          {automation.description && (
+                            <Typography variant="caption" color="text.secondary" component="span">
+                              {automation.description}
+                            </Typography>
+                          )}
+                          <Typography variant="caption" color="text.secondary" component="span">
+                            Triggered {automation.triggerCount} times
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                    <ListItemSecondaryAction>
+                      <Tooltip title={automation.enabled ? 'Disable' : 'Enable'}>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleToggleAutomation(automation.id, !automation.enabled)}
+                        >
+                          {automation.enabled ? (
+                            <CheckCircle fontSize="small" color="success" />
+                          ) : (
+                            <Sync fontSize="small" />
+                          )}
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleDeleteAutomation(automation.id)}
+                          sx={{ color: 'error.main' }}
+                        >
+                          <Delete fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </ListItemSecondaryAction>
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </Paper>
+        </Grid>
       </Grid>
 
       {/* Create Key Dialog */}
@@ -1034,6 +1286,107 @@ export default function SettingsPage() {
               </Button>
             </>
           )}
+        </DialogActions>
+      </Dialog>
+
+      {/* Automation Dialog */}
+      <Dialog open={automationDialogOpen} onClose={resetAutomationDialog} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <AutoFixHigh color="warning" />
+          Create Automation
+        </DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            label="Name"
+            placeholder="e.g., Review task for new PRs"
+            value={automationName}
+            onChange={(e) => setAutomationName(e.target.value)}
+            sx={{ mt: 1, mb: 2 }}
+          />
+          
+          <TextField
+            fullWidth
+            label="Description (optional)"
+            placeholder="What does this automation do?"
+            value={automationDescription}
+            onChange={(e) => setAutomationDescription(e.target.value)}
+            multiline
+            rows={2}
+            sx={{ mb: 2 }}
+          />
+          
+          <Divider sx={{ my: 2 }} />
+          
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            When this happens...
+          </Typography>
+          <TextField
+            select
+            fullWidth
+            value={automationTrigger}
+            onChange={(e) => setAutomationTrigger(e.target.value)}
+            size="small"
+            sx={{ mb: 2 }}
+            SelectProps={{ native: true }}
+          >
+            <option value="">Select a trigger...</option>
+            <optgroup label="GitHub Events">
+              <option value="github_pr_opened">PR Opened</option>
+              <option value="github_pr_merged">PR Merged</option>
+              <option value="github_pr_closed">PR Closed</option>
+              <option value="github_issue_opened">Issue Opened</option>
+              <option value="github_issue_closed">Issue Closed</option>
+            </optgroup>
+            <optgroup label="Task Events">
+              <option value="task_created">Task Created</option>
+              <option value="task_moved">Task Moved</option>
+              <option value="task_completed">Task Completed</option>
+            </optgroup>
+            <optgroup label="Time-Based">
+              <option value="due_date_approaching">Due Date Approaching</option>
+              <option value="due_date_passed">Due Date Passed</option>
+            </optgroup>
+          </TextField>
+          
+          <Typography variant="subtitle2" sx={{ mb: 1 }}>
+            Do this...
+          </Typography>
+          <TextField
+            select
+            fullWidth
+            value={automationAction}
+            onChange={(e) => setAutomationAction(e.target.value)}
+            size="small"
+            SelectProps={{ native: true }}
+          >
+            <option value="">Select an action...</option>
+            <option value="create_task">Create Task</option>
+            <option value="move_task">Move Task</option>
+            <option value="update_task">Update Task</option>
+            <option value="add_label">Add Label</option>
+            <option value="add_comment">Add Comment</option>
+            <option value="notify">Send Notification</option>
+            <option value="archive_task">Archive Task</option>
+          </TextField>
+          
+          <Alert severity="info" sx={{ mt: 2 }}>
+            <Typography variant="caption">
+              Advanced action parameters can be configured via the API. This UI covers basic rule creation.
+            </Typography>
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={resetAutomationDialog} color="inherit">
+            Cancel
+          </Button>
+          <Button
+            onClick={handleCreateAutomation}
+            variant="contained"
+            disabled={!automationName.trim() || !automationTrigger || !automationAction || creatingAutomation}
+          >
+            {creatingAutomation ? 'Creating...' : 'Create'}
+          </Button>
         </DialogActions>
       </Dialog>
 

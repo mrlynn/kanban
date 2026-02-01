@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -21,6 +21,10 @@ import {
   Tooltip,
   useTheme,
   alpha,
+  TextField,
+  InputAdornment,
+  Collapse,
+  Snackbar,
 } from '@mui/material';
 import {
   TrendingUp,
@@ -33,6 +37,10 @@ import {
   Refresh,
   Error as ErrorIcon,
   ArrowForward,
+  Terminal,
+  Send,
+  KeyboardArrowUp,
+  KeyboardArrowDown,
 } from '@mui/icons-material';
 import {
   BarChart,
@@ -97,6 +105,73 @@ export default function DashboardPage() {
   const [metrics, setMetrics] = useState<MetricsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Command bar state
+  const [command, setCommand] = useState('');
+  const [commandHistory, setCommandHistory] = useState<string[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [commandResult, setCommandResult] = useState<{ message: string; success: boolean } | null>(null);
+  const [executing, setExecuting] = useState(false);
+  const [showCommandBar, setShowCommandBar] = useState(true);
+  const commandInputRef = useRef<HTMLInputElement>(null);
+
+  // Execute command
+  const executeCommand = async (cmd: string) => {
+    if (!cmd.trim() || executing) return;
+    
+    setExecuting(true);
+    setCommandResult(null);
+    
+    try {
+      const res = await fetch('/api/commands', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: cmd }),
+      });
+      
+      const data = await res.json();
+      
+      if (res.ok) {
+        setCommandResult({ message: data.message || 'Done', success: true });
+        setCommandHistory(prev => [cmd, ...prev.slice(0, 19)]);
+        setCommand('');
+        setHistoryIndex(-1);
+        // Refresh metrics after command execution
+        fetchMetrics();
+      } else {
+        setCommandResult({ message: data.error || 'Command failed', success: false });
+      }
+    } catch (err) {
+      setCommandResult({ message: 'Failed to execute command', success: false });
+    } finally {
+      setExecuting(false);
+    }
+  };
+
+  // Handle keyboard shortcuts
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      executeCommand(command);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (commandHistory.length > 0) {
+        const newIndex = Math.min(historyIndex + 1, commandHistory.length - 1);
+        setHistoryIndex(newIndex);
+        setCommand(commandHistory[newIndex]);
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (historyIndex > 0) {
+        const newIndex = historyIndex - 1;
+        setHistoryIndex(newIndex);
+        setCommand(commandHistory[newIndex]);
+      } else if (historyIndex === 0) {
+        setHistoryIndex(-1);
+        setCommand('');
+      }
+    }
+  };
 
   const fetchMetrics = useCallback(async () => {
     try {
@@ -169,7 +244,7 @@ export default function DashboardPage() {
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1600, mx: 'auto' }}>
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Box>
           <Typography variant="h4" fontWeight="bold">
             🎛️ Control Center
@@ -178,12 +253,116 @@ export default function DashboardPage() {
             Your work at a glance
           </Typography>
         </Box>
-        <Tooltip title="Refresh">
-          <IconButton onClick={fetchMetrics} disabled={loading}>
-            <Refresh />
-          </IconButton>
-        </Tooltip>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Tooltip title={showCommandBar ? 'Hide command bar' : 'Show command bar'}>
+            <IconButton onClick={() => setShowCommandBar(!showCommandBar)}>
+              <Terminal />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Refresh">
+            <IconButton onClick={fetchMetrics} disabled={loading}>
+              <Refresh />
+            </IconButton>
+          </Tooltip>
+        </Box>
       </Box>
+
+      {/* Command Bar */}
+      <Collapse in={showCommandBar}>
+        <Paper
+          sx={{
+            p: 2,
+            mb: 3,
+            bgcolor: alpha(theme.palette.background.paper, 0.7),
+            backdropFilter: 'blur(10px)',
+            border: '1px solid',
+            borderColor: alpha(theme.palette.primary.main, 0.2),
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+            <Terminal sx={{ fontSize: 18, color: 'primary.main' }} />
+            <Typography variant="subtitle2" color="primary.main">
+              Command Center
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
+              Press Enter to execute • ↑↓ for history
+            </Typography>
+          </Box>
+          
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="Try: create task Fix the bug, priority high, due tomorrow"
+            value={command}
+            onChange={(e) => setCommand(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={executing}
+            inputRef={commandInputRef}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Typography sx={{ fontFamily: 'monospace', color: 'primary.main' }}>{'>'}</Typography>
+                </InputAdornment>
+              ),
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    size="small"
+                    onClick={() => executeCommand(command)}
+                    disabled={!command.trim() || executing}
+                  >
+                    {executing ? <CircularProgress size={18} /> : <Send fontSize="small" />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+              sx: {
+                fontFamily: 'monospace',
+                bgcolor: alpha('#000', 0.3),
+              },
+            }}
+          />
+          
+          {commandResult && (
+            <Alert
+              severity={commandResult.success ? 'success' : 'error'}
+              sx={{ mt: 1 }}
+              onClose={() => setCommandResult(null)}
+            >
+              {commandResult.message}
+            </Alert>
+          )}
+          
+          <Box sx={{ mt: 1.5, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ mr: 1 }}>
+              Examples:
+            </Typography>
+            {[
+              'show P1 tasks',
+              'move "task name" to done',
+              'create task: New feature, p2',
+              'complete demo video task',
+            ].map((example) => (
+              <Chip
+                key={example}
+                label={example}
+                size="small"
+                variant="outlined"
+                onClick={() => {
+                  setCommand(example);
+                  commandInputRef.current?.focus();
+                }}
+                sx={{
+                  fontSize: '0.7rem',
+                  height: 22,
+                  cursor: 'pointer',
+                  fontFamily: 'monospace',
+                  '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.1) },
+                }}
+              />
+            ))}
+          </Box>
+        </Paper>
+      </Collapse>
 
       <Grid container spacing={3}>
         {/* Health Score Card */}

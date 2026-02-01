@@ -42,7 +42,7 @@
   "homepage": "https://github.com/mrlynn/moltboard#readme",
   "clawdbot": {
     "extensions": [
-      "./dist/index.js"
+      "./index.ts"
     ],
     "channel": {
       "id": "moltboard",

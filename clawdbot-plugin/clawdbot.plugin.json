@@ -1,71 +1,29 @@
 {
   "id": "moltboard",
-  "name": "Moltboard",
-  "description": "Moltboard task management channel for Clawdbot",
-  "version": "1.0.0",
   "channels": ["moltboard"],
-  "entry": "./dist/index.js",
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
     "properties": {
       "enabled": {
         "type": "boolean",
-        "default": true,
-        "description": "Enable the Moltboard channel"
+        "default": true
       },
       "apiUrl": {
         "type": "string",
-        "default": "https://kanban.mlynn.org",
-        "description": "Moltboard API base URL"
+        "default": "https://kanban.mlynn.org"
       },
       "apiKey": {
-        "type": "string",
-        "description": "API key for authentication (from Moltboard Settings)"
+        "type": "string"
       },
       "pollIntervalMs": {
         "type": "number",
-        "default": 5000,
-        "description": "Polling interval in milliseconds"
+        "default": 5000
       },
       "defaultBoardId": {
-        "type": "string",
-        "description": "Default board ID for message routing"
-      },
-      "accounts": {
-        "type": "object",
-        "description": "Multiple account configurations",
-        "additionalProperties": {
-          "type": "object",
-          "properties": {
-            "enabled": { "type": "boolean" },
-            "apiUrl": { "type": "string" },
-            "apiKey": { "type": "string" },
-            "pollIntervalMs": { "type": "number" },
-            "defaultBoardId": { "type": "string" }
-          }
-        }
+        "type": "string"
       }
     },
     "required": ["apiKey"]
-  },
-  "uiHints": {
-    "apiKey": {
-      "label": "API Key",
-      "sensitive": true,
-      "placeholder": "moltboard_sk_..."
-    },
-    "apiUrl": {
-      "label": "Moltboard API URL",
-      "placeholder": "https://kanban.mlynn.org"
-    },
-    "pollIntervalMs": {
-      "label": "Poll Interval (ms)",
-      "placeholder": "5000"
-    },
-    "defaultBoardId": {
-      "label": "Default Board ID",
-      "placeholder": "board_..."
-    }
   }
 }
