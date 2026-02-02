@@ -47,6 +47,8 @@ import {
   AutoFixHigh,
   SmartToy,
   ArrowForward,
+  CreditCard,
+  Rocket,
 } from '@mui/icons-material';
 
 interface Tenant {
@@ -54,6 +56,8 @@ interface Tenant {
   name: string;
   slug: string;
   plan: 'free' | 'pro' | 'team';
+  stripeCustomerId?: string;
+  planExpiresAt?: string;
   usage: {
     boards: number;
     tasks: number;
@@ -622,9 +626,112 @@ export default function SettingsPage() {
           </Paper>
         </Grid>
 
-        {/* API Keys */}
+        {/* Billing & Plan */}
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 3, height: '100%' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CreditCard sx={{ color: 'accent.secondary' }} />
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  Billing
+                </Typography>
+              </Box>
+              {tenant?.plan !== 'free' && tenant?.stripeCustomerId && (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={async () => {
+                    try {
+                      const res = await fetch('/api/billing/portal', { method: 'POST' });
+                      const data = await res.json();
+                      if (data.url) window.location.href = data.url;
+                    } catch (err) {
+                      console.error('Failed to open billing portal:', err);
+                    }
+                  }}
+                >
+                  Manage
+                </Button>
+              )}
+            </Box>
+
+            <Box sx={{ mb: 3 }}>
+              <Typography color="text.secondary" variant="body2" sx={{ mb: 1 }}>
+                Current Plan
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Chip
+                  label={tenant?.plan === 'free' ? 'Free' : tenant?.plan === 'pro' ? 'Pro' : 'Team'}
+                  sx={{
+                    bgcolor: (theme) => alpha(planColors[tenant?.plan || 'free'], 0.15),
+                    color: planColors[tenant?.plan || 'free'],
+                    fontWeight: 600,
+                    fontSize: '0.875rem',
+                    px: 1,
+                  }}
+                />
+                {tenant?.plan === 'free' && (
+                  <Typography variant="body2" color="text.secondary">
+                    Free forever • Upgrade anytime
+                  </Typography>
+                )}
+              </Box>
+            </Box>
+
+            {tenant?.plan === 'free' ? (
+              <Box
+                sx={{
+                  p: 2.5,
+                  borderRadius: 2,
+                  bgcolor: (theme) => alpha(theme.palette.accent.secondary, 0.08),
+                  border: '1px solid',
+                  borderColor: (theme) => alpha(theme.palette.accent.secondary, 0.2),
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+                  <Rocket sx={{ color: 'accent.secondary', mt: 0.5 }} />
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                      Unlock more with Pro
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                      Get GitHub integration, Clawdbot AI, more boards, and automations.
+                    </Typography>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      href="/pricing"
+                      sx={{
+                        bgcolor: 'accent.secondary',
+                        color: 'background.default',
+                        '&:hover': {
+                          bgcolor: (theme) => alpha(theme.palette.accent.secondary, 0.85),
+                        },
+                      }}
+                    >
+                      View Plans
+                    </Button>
+                  </Box>
+                </Box>
+              </Box>
+            ) : (
+              <Box>
+                <Typography variant="body2" color="text.secondary">
+                  Thank you for supporting Moltboard! Your subscription helps us keep building.
+                </Typography>
+                {tenant?.planExpiresAt && (
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                    Renews: {new Date(tenant.planExpiresAt).toLocaleDateString()}
+                  </Typography>
+                )}
+              </Box>
+            )}
+          </Paper>
+        </Grid>
+
+        {/* API Keys */}
+        <Grid item xs={12}>
+          <Paper sx={{ p: 3 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
               <Typography variant="h6" sx={{ fontWeight: 600 }}>
                 API Keys
