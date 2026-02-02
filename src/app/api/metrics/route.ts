@@ -71,18 +71,24 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Tasks by column
-    const tasksByColumn: Record<string, { count: number; title: string }> = {};
+    // Tasks by column - aggregate by title (not ID) to handle multiple boards
+    const tasksByColumnTitle: Record<string, { count: number; title: string }> = {};
     for (const task of allTasks) {
       const colInfo = columnMap.get(task.columnId);
-      if (!tasksByColumn[task.columnId]) {
-        tasksByColumn[task.columnId] = {
+      const title = colInfo?.title || 'Unknown';
+      const normalizedTitle = title.trim();
+      
+      if (!tasksByColumnTitle[normalizedTitle]) {
+        tasksByColumnTitle[normalizedTitle] = {
           count: 0,
-          title: colInfo?.title || task.columnId,
+          title: normalizedTitle,
         };
       }
-      tasksByColumn[task.columnId].count++;
+      tasksByColumnTitle[normalizedTitle].count++;
     }
+    
+    // Use title as key for cleaner output
+    const tasksByColumn = tasksByColumnTitle;
 
     // Tasks by priority
     const tasksByPriority: Record<string, number> = { p0: 0, p1: 0, p2: 0, p3: 0, none: 0 };
