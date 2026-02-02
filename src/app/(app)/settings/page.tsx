@@ -45,6 +45,8 @@ import {
   Link as LinkIcon,
   Sync,
   AutoFixHigh,
+  SmartToy,
+  ArrowForward,
 } from '@mui/icons-material';
 
 interface Tenant {
@@ -857,6 +859,55 @@ export default function SettingsPage() {
                 ))}
               </List>
             )}
+          </Paper>
+        </Grid>
+
+        {/* Clawdbot AI Integration */}
+        <Grid item xs={12}>
+          <Paper sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <SmartToy sx={{ color: '#FF6B35' }} />
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  Clawdbot AI Integration
+                </Typography>
+              </Box>
+              <Button
+                startIcon={<ArrowForward />}
+                variant="contained"
+                size="small"
+                href="/integrations/clawdbot"
+                sx={{
+                  background: 'linear-gradient(135deg, #FF6B35 0%, #F7931E 100%)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #E5612F 0%, #DE841B 100%)',
+                  },
+                }}
+              >
+                Configure
+              </Button>
+            </Box>
+            
+            <Typography color="text.secondary" sx={{ mb: 2 }}>
+              Connect your personal Clawdbot AI assistant to manage tasks with natural language commands.
+            </Typography>
+            
+            <Box sx={{ 
+              p: 2, 
+              borderRadius: 2, 
+              bgcolor: alpha('#FF6B35', 0.08),
+              border: '1px solid',
+              borderColor: alpha('#FF6B35', 0.2),
+            }}>
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                <strong>What you can do:</strong>
+              </Typography>
+              <Box component="ul" sx={{ m: 0, pl: 2 }}>
+                <li><Typography variant="body2" color="text.secondary">Chat with AI about your tasks and projects</Typography></li>
+                <li><Typography variant="body2" color="text.secondary">Create, move, and update tasks using natural language</Typography></li>
+                <li><Typography variant="body2" color="text.secondary">Get notified about task changes via your AI</Typography></li>
+              </Box>
+            </Box>
           </Paper>
         </Grid>
 
