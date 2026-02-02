@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
 import { ChatMessage } from '@/types/chat';
 import { requireScope, AuthError } from '@/lib/tenant-auth';
+import { sendToClawdbot } from '@/lib/clawdbot-webhook';
 import crypto from 'crypto';
 
 function generateId(prefix: string): string {
@@ -133,6 +134,24 @@ export async function POST(request: NextRequest) {
         // Don't fail the message if task detection fails
         console.error('[chat] Task detection error:', error);
       }
+
+      // Send to Clawdbot via webhook (non-blocking)
+      sendToClawdbot(
+        {
+          id: message.id,
+          content: message.content,
+          author: message.author,
+          boardId: message.boardId,
+          taskId: message.taskId,
+          taskTitle: message.taskTitle,
+          replyTo: message.replyTo,
+          createdAt: message.createdAt.toISOString(),
+        },
+        context.tenantId,
+        'message'
+      ).catch((err) => {
+        console.error('[chat] Webhook send error:', err);
+      });
     }
     
     return NextResponse.json(message, { status: 201 });
