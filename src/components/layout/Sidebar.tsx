@@ -38,6 +38,7 @@ import {
   Settings,
   Speed,
 } from '@mui/icons-material';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { Board, Actor } from '@/types/kanban';
@@ -211,9 +212,9 @@ export function Sidebar({ width, onNavigate }: SidebarProps) {
           position: 'fixed',
           left: 0,
           top: 0,
-          bgcolor: 'background.paper',
+          bgcolor: 'surface.secondary',
           borderRight: '1px solid',
-          borderColor: alpha('#ffffff', 0.1),
+          borderColor: 'border.subtle',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -229,11 +230,11 @@ export function Sidebar({ width, onNavigate }: SidebarProps) {
             alignItems: 'center',
             gap: 1.5,
             borderBottom: '1px solid',
-            borderColor: alpha('#ffffff', 0.1),
+            borderColor: 'border.subtle',
             cursor: 'pointer',
             transition: 'background 0.2s',
             '&:hover': {
-              bgcolor: alpha('#ffffff', 0.03),
+              bgcolor: 'action.hover',
             },
           }}
         >
@@ -266,16 +267,22 @@ export function Sidebar({ width, onNavigate }: SidebarProps) {
             sx={{
               borderRadius: 1,
               mb: 1,
-              bgcolor: pathname === '/dashboard' ? alpha('#00ED64', 0.15) : alpha('#F97316', 0.08),
-              '&:hover': { bgcolor: pathname === '/dashboard' ? alpha('#00ED64', 0.2) : alpha('#F97316', 0.15) },
+              bgcolor: pathname === '/dashboard' 
+                ? (theme) => alpha(theme.palette.primary.main, 0.12) 
+                : (theme) => alpha(theme.palette.accent.warning, 0.08),
+              '&:hover': { 
+                bgcolor: pathname === '/dashboard' 
+                  ? (theme) => alpha(theme.palette.primary.main, 0.18)
+                  : (theme) => alpha(theme.palette.accent.warning, 0.12),
+              },
               '&.Mui-selected': {
-                bgcolor: alpha('#00ED64', 0.15),
-                '&:hover': { bgcolor: alpha('#00ED64', 0.2) },
+                bgcolor: (theme) => alpha(theme.palette.primary.main, 0.12),
+                '&:hover': { bgcolor: (theme) => alpha(theme.palette.primary.main, 0.18) },
               },
             }}
           >
             <ListItemIcon sx={{ minWidth: 36 }}>
-              <Speed fontSize="small" sx={{ color: pathname === '/dashboard' ? 'primary.main' : '#F97316' }} />
+              <Speed fontSize="small" sx={{ color: pathname === '/dashboard' ? 'primary.main' : 'accent.warning' }} />
             </ListItemIcon>
             <ListItemText
               primary="Control Center"
@@ -319,8 +326,8 @@ export function Sidebar({ width, onNavigate }: SidebarProps) {
                       borderRadius: 1,
                       mb: 0.5,
                       '&.Mui-selected': {
-                        bgcolor: alpha('#00ED64', 0.15),
-                        '&:hover': { bgcolor: alpha('#00ED64', 0.2) },
+                        bgcolor: (theme) => alpha(theme.palette.primary.main, 0.12),
+                        '&:hover': { bgcolor: (theme) => alpha(theme.palette.primary.main, 0.18) },
                       },
                     }}
                   >
@@ -342,7 +349,7 @@ export function Sidebar({ width, onNavigate }: SidebarProps) {
           </List>
         </Box>
 
-        <Divider sx={{ my: 2, borderColor: alpha('#ffffff', 0.1) }} />
+        <Divider sx={{ my: 2, borderColor: 'border.subtle' }} />
 
         {/* Activity Section */}
         <Box sx={{ px: 1 }}>
@@ -383,7 +390,7 @@ export function Sidebar({ width, onNavigate }: SidebarProps) {
                         py: 0.75,
                         borderRadius: 1,
                         cursor: 'pointer',
-                        '&:hover': { bgcolor: alpha('#ffffff', 0.03) },
+                        '&:hover': { bgcolor: 'action.hover' },
                       }}
                       onClick={() => navigateTo(`/board/${activity.boardId}`)}
                     >
@@ -435,8 +442,8 @@ export function Sidebar({ width, onNavigate }: SidebarProps) {
             sx={{
               borderRadius: 1,
               '&.Mui-selected': {
-                bgcolor: alpha('#00ED64', 0.15),
-                '&:hover': { bgcolor: alpha('#00ED64', 0.2) },
+                bgcolor: (theme) => alpha(theme.palette.primary.main, 0.12),
+                '&:hover': { bgcolor: (theme) => alpha(theme.palette.primary.main, 0.18) },
               },
             }}
           >
@@ -460,7 +467,7 @@ export function Sidebar({ width, onNavigate }: SidebarProps) {
               px: 2,
               py: 1.5,
               borderTop: '1px solid',
-              borderColor: alpha('#ffffff', 0.1),
+              borderColor: 'border.subtle',
               display: 'flex',
               alignItems: 'center',
               gap: 1.5,
@@ -502,6 +509,7 @@ export function Sidebar({ width, onNavigate }: SidebarProps) {
                 {session.user.email}
               </Typography>
             </Box>
+            <ThemeToggle />
             <Tooltip title="Sign out">
               <IconButton
                 size="small"
@@ -526,7 +534,7 @@ export function Sidebar({ width, onNavigate }: SidebarProps) {
             gap: 2,
             justifyContent: 'center',
             borderTop: session?.user ? 'none' : '1px solid',
-            borderColor: alpha('#ffffff', 0.1),
+            borderColor: 'border.subtle',
             pt: 1.5,
           }}
         >
