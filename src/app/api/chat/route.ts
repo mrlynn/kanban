@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
 import { ChatMessage } from '@/types/chat';
 import { requireScope, AuthError } from '@/lib/tenant-auth';
-import { sendToClawdbot } from '@/lib/clawdbot-webhook';
+import { sendToOpenClaw } from '@/lib/openclaw-webhook';
 import crypto from 'crypto';
 
 function generateId(prefix: string): string {
@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
     // Check for task creation intent from user messages
     if (actor === 'mike') {
       try {
-        const { handleChatMessage } = await import('@/lib/moltbot/features/task-creator');
+        const { handleChatMessage } = await import('@/lib/agent/features/task-creator');
         const result = await handleChatMessage(
           context.tenantId,
           message.id,
@@ -135,8 +135,8 @@ export async function POST(request: NextRequest) {
         console.error('[chat] Task detection error:', error);
       }
 
-      // Send to Clawdbot via webhook (non-blocking)
-      sendToClawdbot(
+      // Send to OpenClaw via webhook (non-blocking)
+      sendToOpenClaw(
         {
           id: message.id,
           content: message.content,

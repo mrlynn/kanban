@@ -834,7 +834,7 @@ export default function SettingsPage() {
                       Unlock more with Pro
                     </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Get GitHub integration, Clawdbot AI, more boards, and automations.
+                      Get GitHub integration, OpenClaw AI, more boards, and automations.
                     </Typography>
                     <Button
                       variant="contained"
@@ -1083,7 +1083,7 @@ export default function SettingsPage() {
                   No API keys yet
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Create one to connect Clawdbot
+                  Create one to connect OpenClaw
                 </Typography>
               </Box>
             ) : (
@@ -1132,13 +1132,13 @@ export default function SettingsPage() {
           </Paper>
         </Grid>
 
-        {/* Clawdbot Integration */}
+        {/* OpenClaw Integration */}
         <Grid item xs={12}>
           <Paper sx={{ p: 3 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
               <Code sx={{ color: 'primary.main' }} />
               <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                Connect to Clawdbot
+                Connect to OpenClaw
               </Typography>
             </Box>
             
@@ -1299,21 +1299,21 @@ export default function SettingsPage() {
           </Paper>
         </Grid>
 
-        {/* Clawdbot AI Integration */}
+        {/* OpenClaw AI Integration */}
         <Grid item xs={12}>
           <Paper sx={{ p: 3 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <SmartToy sx={{ color: '#FF6B35' }} />
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  Clawdbot AI Integration
+                  OpenClaw AI Integration
                 </Typography>
               </Box>
               <Button
                 startIcon={<ArrowForward />}
                 variant="contained"
                 size="small"
-                href="/integrations/clawdbot"
+                href="/integrations/openclaw"
                 sx={{
                   background: 'linear-gradient(135deg, #FF6B35 0%, #F7931E 100%)',
                   '&:hover': {
@@ -1326,7 +1326,7 @@ export default function SettingsPage() {
             </Box>
             
             <Typography color="text.secondary" sx={{ mb: 2 }}>
-              Connect your personal Clawdbot AI assistant to manage tasks with natural language commands.
+              Connect your personal OpenClaw AI assistant to manage tasks with natural language commands.
             </Typography>
             
             <Box sx={{ 
@@ -1464,7 +1464,7 @@ export default function SettingsPage() {
             autoFocus
             fullWidth
             label="Key Name"
-            placeholder="e.g., My Clawdbot"
+            placeholder="e.g., My OpenClaw"
             value={newKeyName}
             onChange={(e) => setNewKeyName(e.target.value)}
             sx={{ mt: 1, mb: 3 }}

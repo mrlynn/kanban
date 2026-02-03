@@ -1,12 +1,12 @@
 /**
- * Clawdbot Webhook Response Endpoint
+ * OpenClaw Webhook Response Endpoint
  * 
- * POST /api/webhooks/clawdbot
+ * POST /api/webhooks/openclaw
  * 
- * Receives responses from Clawdbot and stores them as chat messages.
+ * Receives responses from OpenClaw and stores them as chat messages.
  * Supports two authentication methods:
  * 1. API Key auth (per-user integrations) - X-Moltboard-Api-Key header
- * 2. Signature auth (legacy/env var) - X-Clawdbot-Signature header
+ * 2. Signature auth (legacy/env var) - X-OpenClaw-Signature header
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -16,8 +16,8 @@ import {
   verifySignature, 
   getWebhookConfigFromEnv, 
   findIntegrationByApiKey 
-} from '@/lib/clawdbot-webhook';
-import { ClawdbotIntegration, ClawdbotInboundPayload } from '@/types/integrations';
+} from '@/lib/openclaw-webhook';
+import { OpenClawIntegration, OpenClawInboundPayload } from '@/types/integrations';
 import crypto from 'crypto';
 
 function generateId(prefix: string): string {
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     
     // Try API key authentication first (per-user integrations)
     const apiKey = request.headers.get('X-Moltboard-Api-Key');
-    let integration: ClawdbotIntegration | null = null;
+    let integration: OpenClawIntegration | null = null;
     let tenantId: string | null = null;
     let userId: string | null = null;
 
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
       integration = await findIntegrationByApiKey(apiKey);
       
       if (!integration) {
-        console.warn('[clawdbot-webhook] Invalid API key');
+        console.warn('[openclaw-webhook] Invalid API key');
         return NextResponse.json(
           { error: 'Invalid API key' },
           { status: 401 }
@@ -51,10 +51,13 @@ export async function POST(request: NextRequest) {
       
       // Verify signature with integration's webhook secret
       if (integration.webhookSecret) {
-        const signature = request.headers.get('X-Clawdbot-Signature') || '';
+        // Accept both new and legacy header names
+        const signature = request.headers.get('X-OpenClaw-Signature') 
+          || request.headers.get('X-Clawdbot-Signature') 
+          || '';
         
         if (!verifySignature(rawBody, signature, integration.webhookSecret)) {
-          console.warn('[clawdbot-webhook] Invalid signature for integration');
+          console.warn('[openclaw-webhook] Invalid signature for integration');
           return NextResponse.json(
             { error: 'Invalid signature' },
             { status: 401 }
@@ -66,10 +69,13 @@ export async function POST(request: NextRequest) {
       const config = getWebhookConfigFromEnv();
       
       if (config.secret) {
-        const signature = request.headers.get('X-Clawdbot-Signature') || '';
+        // Accept both new and legacy header names
+        const signature = request.headers.get('X-OpenClaw-Signature')
+          || request.headers.get('X-Clawdbot-Signature')
+          || '';
         
         if (!verifySignature(rawBody, signature, config.secret)) {
-          console.warn('[clawdbot-webhook] Invalid signature (legacy)');
+          console.warn('[openclaw-webhook] Invalid signature (legacy)');
           return NextResponse.json(
             { error: 'Invalid signature' },
             { status: 401 }
@@ -79,7 +85,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse payload
-    const payload: ClawdbotInboundPayload = JSON.parse(rawBody);
+    const payload: OpenClawInboundPayload = JSON.parse(rawBody);
     
     if (!payload.message?.content) {
       return NextResponse.json(
@@ -108,11 +114,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Create the response message
+    // NOTE: author is 'agent' for new records; legacy data may have 'moltbot'
     const message: ChatMessage = {
       id: generateId('msg'),
       tenantId: finalTenantId,
       boardId: payload.message.boardId,
-      author: 'moltbot',
+      author: 'agent',
       content: payload.message.content.trim(),
       taskId: payload.message.taskId,
       taskTitle: payload.message.taskTitle,
@@ -125,28 +132,38 @@ export async function POST(request: NextRequest) {
 
     // Update integration stats if this came from a per-user integration
     if (integration) {
-      await db.collection<ClawdbotIntegration>('clawdbot_integrations').updateOne(
+      const updateOp = {
+        $set: {
+          status: 'connected' as const,
+          lastConnectedAt: new Date(),
+          lastMessageAt: new Date(),
+          updatedAt: new Date(),
+        },
+        $inc: { messagesReceived: 1 },
+      };
+      
+      // Try new collection, then legacy
+      const result = await db.collection<OpenClawIntegration>('openclaw_integrations').updateOne(
         { id: integration.id },
-        {
-          $set: {
-            status: 'connected',
-            lastConnectedAt: new Date(),
-            lastMessageAt: new Date(),
-            updatedAt: new Date(),
-          },
-          $inc: { messagesReceived: 1 },
-        }
+        updateOp
       );
+      
+      if (result.matchedCount === 0) {
+        await db.collection<OpenClawIntegration>('clawdbot_integrations').updateOne(
+          { id: integration.id },
+          updateOp
+        );
+      }
     }
 
-    console.log(`[clawdbot-webhook] Stored response: ${message.id}${integration ? ` (integration: ${integration.id})` : ''}`);
+    console.log(`[openclaw-webhook] Stored response: ${message.id}${integration ? ` (integration: ${integration.id})` : ''}`);
 
     return NextResponse.json({
       success: true,
       messageId: message.id,
     });
   } catch (error) {
-    console.error('[clawdbot-webhook] Error:', error);
+    console.error('[openclaw-webhook] Error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
