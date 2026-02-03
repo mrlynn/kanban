@@ -3,6 +3,8 @@ import type { Provider } from 'next-auth/providers/index';
 import GitHubProvider from 'next-auth/providers/github';
 import GoogleProvider from 'next-auth/providers/google';
 import CredentialsProvider from 'next-auth/providers/credentials';
+import { getDb } from './mongodb';
+import { BoardInvitation, BoardMember } from '@/types/team';
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -48,6 +50,44 @@ if (isDev) {
   );
 }
 
+/**
+ * Check if an email has been invited to any board or is already a board member
+ */
+async function hasInvitationOrMembership(email: string): Promise<boolean> {
+  try {
+    const db = await getDb();
+    const normalizedEmail = email.toLowerCase();
+    
+    // Check for pending invitation
+    const invitation = await db.collection<BoardInvitation>('boardInvitations').findOne({
+      email: normalizedEmail,
+      acceptedAt: { $exists: false },
+      declinedAt: { $exists: false },
+      expiresAt: { $gt: new Date() },
+    });
+    
+    if (invitation) {
+      console.log('[Auth] User has pending board invitation:', normalizedEmail);
+      return true;
+    }
+    
+    // Check if already a board member
+    const membership = await db.collection<BoardMember>('boardMembers').findOne({
+      email: normalizedEmail,
+    });
+    
+    if (membership) {
+      console.log('[Auth] User is already a board member:', normalizedEmail);
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('[Auth] Error checking invitation/membership:', error);
+    return false;
+  }
+}
+
 export const authOptions: NextAuthOptions = {
   providers,
   callbacks: {
@@ -57,7 +97,9 @@ export const authOptions: NextAuthOptions = {
         return true;
       }
       
-      // GitHub: check against username allowlist
+      const userEmail = user?.email?.toLowerCase();
+      
+      // GitHub: check against username allowlist OR invitation
       if (account?.provider === 'github') {
         const allowedUsers = process.env.ALLOWED_GITHUB_USERS?.split(',').map(u => u.toLowerCase().trim()) || [];
         const githubUsername = (profile as any)?.login?.toLowerCase();
@@ -70,15 +112,25 @@ export const authOptions: NextAuthOptions = {
           return true;
         }
         
-        const isAllowed = allowedUsers.includes(githubUsername);
-        console.log('[Auth] GitHub allowed:', isAllowed);
-        return isAllowed;
+        // Check allowlist first
+        if (allowedUsers.includes(githubUsername)) {
+          console.log('[Auth] GitHub user on allowlist');
+          return true;
+        }
+        
+        // Check if they have an invitation or membership
+        if (userEmail && await hasInvitationOrMembership(userEmail)) {
+          console.log('[Auth] GitHub user has invitation/membership, allowing');
+          return true;
+        }
+        
+        console.log('[Auth] GitHub user not allowed');
+        return false;
       }
       
-      // Google: check against email allowlist
+      // Google: check against email allowlist OR invitation
       if (account?.provider === 'google') {
         const allowedEmails = process.env.ALLOWED_GOOGLE_EMAILS?.split(',').map(e => e.toLowerCase().trim()) || [];
-        const userEmail = user?.email?.toLowerCase();
         
         console.log('[Auth] Google email:', userEmail);
         console.log('[Auth] Allowed Google emails:', allowedEmails);
@@ -89,9 +141,20 @@ export const authOptions: NextAuthOptions = {
           return true;
         }
         
-        const isAllowed = userEmail ? allowedEmails.includes(userEmail) : false;
-        console.log('[Auth] Google allowed:', isAllowed);
-        return isAllowed;
+        // Check allowlist first
+        if (userEmail && allowedEmails.includes(userEmail)) {
+          console.log('[Auth] Google email on allowlist');
+          return true;
+        }
+        
+        // Check if they have an invitation or membership
+        if (userEmail && await hasInvitationOrMembership(userEmail)) {
+          console.log('[Auth] Google user has invitation/membership, allowing');
+          return true;
+        }
+        
+        console.log('[Auth] Google user not allowed');
+        return false;
       }
       
       // Default: allow (for any future providers)
