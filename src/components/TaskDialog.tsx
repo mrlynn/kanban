@@ -17,15 +17,18 @@ import {
   IconButton,
   Autocomplete,
   Avatar,
+  CircularProgress,
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { Clear } from '@mui/icons-material';
 import dayjs, { Dayjs } from 'dayjs';
-import { Task, Priority, PriorityConfig, USERS, User } from '@/types/kanban';
+import { Task, Priority, PriorityConfig, USERS } from '@/types/kanban';
+import { AssignableUser } from '@/types/team';
 
 interface TaskDialogProps {
   open: boolean;
   task: Task | null;
+  boardId?: string;
   onClose: () => void;
   onSave: (data: Partial<Task>) => void;
 }
@@ -50,13 +53,45 @@ const availableLabels = [
 
 const priorities: Priority[] = ['p0', 'p1', 'p2', 'p3'];
 
-export function TaskDialog({ open, task, onClose, onSave }: TaskDialogProps) {
+export function TaskDialog({ open, task, boardId, onClose, onSave }: TaskDialogProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [labels, setLabels] = useState<string[]>([]);
   const [priority, setPriority] = useState<Priority | ''>('');
   const [dueDate, setDueDate] = useState<Dayjs | null>(null);
-  const [assignee, setAssignee] = useState<User | null>(null);
+  const [assignee, setAssignee] = useState<AssignableUser | null>(null);
+  
+  // Board members for assignment
+  const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
+  // Fetch assignable users when dialog opens
+  useEffect(() => {
+    const fetchBoardId = boardId || task?.boardId;
+    if (open && fetchBoardId) {
+      fetchAssignableUsers(fetchBoardId);
+    }
+  }, [open, boardId, task?.boardId]);
+
+  const fetchAssignableUsers = async (bId: string) => {
+    setLoadingUsers(true);
+    try {
+      const res = await fetch(`/api/boards/${bId}/members`);
+      if (res.ok) {
+        const data = await res.json();
+        setAssignableUsers(data.assignableUsers || []);
+      } else {
+        // Fallback to hardcoded users if API fails
+        setAssignableUsers(USERS.map(u => ({ ...u, email: '' })));
+      }
+    } catch (err) {
+      console.error('Failed to fetch assignable users:', err);
+      // Fallback to hardcoded users
+      setAssignableUsers(USERS.map(u => ({ ...u, email: '' })));
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
 
   // Reset form when task changes
   useEffect(() => {
@@ -66,7 +101,9 @@ export function TaskDialog({ open, task, onClose, onSave }: TaskDialogProps) {
       setLabels(task.labels || []);
       setPriority(task.priority || '');
       setDueDate(task.dueDate ? dayjs(task.dueDate) : null);
-      setAssignee(USERS.find(u => u.id === task.assigneeId) || null);
+      // Set assignee from loaded users or find from task
+      const foundUser = assignableUsers.find(u => u.id === task.assigneeId);
+      setAssignee(foundUser || null);
     } else {
       setTitle('');
       setDescription('');
@@ -75,7 +112,7 @@ export function TaskDialog({ open, task, onClose, onSave }: TaskDialogProps) {
       setDueDate(null);
       setAssignee(null);
     }
-  }, [task, open]);
+  }, [task, open, assignableUsers]);
 
   const handleToggleLabel = (label: string) => {
     setLabels((prev) =>
@@ -218,12 +255,14 @@ export function TaskDialog({ open, task, onClose, onSave }: TaskDialogProps) {
             <Autocomplete
               value={assignee}
               onChange={(_, newValue) => setAssignee(newValue)}
-              options={USERS}
+              options={assignableUsers}
+              loading={loadingUsers}
               getOptionLabel={(option) => option.name}
               isOptionEqualToValue={(option, value) => option.id === value.id}
               renderOption={(props, option) => (
                 <Box component="li" {...props} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                   <Avatar 
+                    src={option.avatar}
                     sx={{ 
                       width: 28, 
                       height: 28, 
@@ -231,20 +270,28 @@ export function TaskDialog({ open, task, onClose, onSave }: TaskDialogProps) {
                       fontSize: '0.875rem',
                     }}
                   >
-                    {option.avatar || option.name[0]}
+                    {option.name[0]}
                   </Avatar>
-                  <Typography variant="body2">{option.name}</Typography>
+                  <Box>
+                    <Typography variant="body2">{option.name}</Typography>
+                    {option.email && (
+                      <Typography variant="caption" color="text.secondary">
+                        {option.email}
+                      </Typography>
+                    )}
+                  </Box>
                 </Box>
               )}
               renderInput={(params) => (
                 <TextField
                   {...params}
                   size="small"
-                  placeholder="Unassigned"
+                  placeholder={loadingUsers ? 'Loading...' : 'Unassigned'}
                   InputProps={{
                     ...params.InputProps,
                     startAdornment: assignee ? (
                       <Avatar 
+                        src={assignee.avatar}
                         sx={{ 
                           width: 24, 
                           height: 24, 
@@ -254,9 +301,15 @@ export function TaskDialog({ open, task, onClose, onSave }: TaskDialogProps) {
                           mr: -0.5,
                         }}
                       >
-                        {assignee.avatar || assignee.name[0]}
+                        {assignee.name[0]}
                       </Avatar>
                     ) : null,
+                    endAdornment: (
+                      <>
+                        {loadingUsers ? <CircularProgress color="inherit" size={20} /> : null}
+                        {params.InputProps.endAdornment}
+                      </>
+                    ),
                   }}
                 />
               )}
