@@ -25,9 +25,10 @@ import {
 import { ChatMessage } from '@/types/chat';
 import { Actor } from '@/types/kanban';
 
-const actorConfig: Record<Actor, { name: string; color: string; avatar: React.ReactNode }> = {
+const actorConfig: Record<string, { name: string; color: string; avatar: React.ReactNode }> = {
   mike: { name: 'Mike', color: '#3B82F6', avatar: <Person fontSize="small" /> },
-  moltbot: { name: 'Moltbot', color: '#F97316', avatar: '🔥' },
+  agent: { name: 'AI Assistant', color: '#F97316', avatar: '🤖' },
+  moltbot: { name: 'AI Assistant', color: '#F97316', avatar: '🤖' }, // Legacy alias
   system: { name: 'System', color: '#6B7280', avatar: <SmartToy fontSize="small" /> },
   api: { name: 'API', color: '#8B5CF6', avatar: 'A' },
 };
@@ -63,10 +64,10 @@ export function ChatSidebar({ boardId }: ChatSidebarProps) {
         const data = await res.json();
         const newMessages = data.messages as ChatMessage[];
         
-        // Count unread messages from moltbot since last check
+        // Count unread messages from agent (or legacy 'moltbot') since last check
         if (isPolling && !open && lastCheckedRef.current) {
           const newBotMessages = newMessages.filter(
-            m => m.author === 'moltbot' && 
+            m => (m.author === 'agent' || m.author === 'moltbot') && 
             new Date(m.createdAt) > new Date(lastCheckedRef.current!)
           );
           setUnreadCount(prev => prev + newBotMessages.length);
@@ -143,7 +144,7 @@ export function ChatSidebar({ boardId }: ChatSidebarProps) {
     <>
       {/* Floating Action Button */}
       <Box sx={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1000 }}>
-        <Tooltip title="Chat with Moltbot">
+        <Tooltip title="Chat with AI Assistant">
           <Badge 
             badgeContent={unreadCount} 
             color="error"
@@ -191,7 +192,7 @@ export function ChatSidebar({ boardId }: ChatSidebarProps) {
             <Avatar sx={{ bgcolor: '#F97316', width: 36, height: 36 }}>🔥</Avatar>
             <Box>
               <Typography variant="subtitle1" fontWeight={600}>
-                Moltbot
+                AI Assistant
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 Your AI Co-founder
@@ -319,7 +320,7 @@ export function ChatSidebar({ boardId }: ChatSidebarProps) {
           <TextField
             fullWidth
             size="small"
-            placeholder="Message Moltbot..."
+            placeholder="Message AI Assistant..."
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             onKeyDown={(e) => {

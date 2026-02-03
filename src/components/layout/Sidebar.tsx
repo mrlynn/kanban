@@ -49,9 +49,10 @@ interface SidebarProps {
 }
 
 // Actor config for activity
-const actorConfig: Record<Actor, { name: string; color: string }> = {
+const actorConfig: Record<string, { name: string; color: string }> = {
   mike: { name: 'Mike', color: '#3B82F6' },
-  moltbot: { name: 'Moltbot', color: '#F97316' },
+  agent: { name: 'AI Assistant', color: '#F97316' },
+  moltbot: { name: 'AI Assistant', color: '#F97316' }, // Legacy alias
   system: { name: 'System', color: '#6B7280' },
   api: { name: 'API', color: '#8B5CF6' },
 };

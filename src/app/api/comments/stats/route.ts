@@ -9,7 +9,7 @@ import { requireScope, AuthError } from '@/lib/tenant-auth';
  * GET /api/comments/stats - Get comment counts per task
  *   Query params:
  *   - boardId: Filter by board
- *   - since: Get moltbot comments newer than this timestamp (for unread tracking)
+ *   - since: Get agent comments newer than this timestamp (for unread tracking)
  */
 
 export async function GET(request: NextRequest) {
@@ -42,7 +42,8 @@ export async function GET(request: NextRequest) {
       ])
       .toArray();
 
-    // Get moltbot comments since timestamp (for unread tracking)
+    // Get agent comments since timestamp (for unread tracking)
+    // Match both 'agent' (new) and 'moltbot' (legacy) for backwards compatibility
     let unreadCounts: Array<{ _id: string; count: number }> = [];
     if (since) {
       const sinceDate = new Date(since);
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
           {
             $match: {
               ...matchStage,
-              author: 'moltbot',
+              author: { $in: ['agent', 'moltbot'] },
               createdAt: { $gt: sinceDate },
             },
           },
@@ -68,17 +69,19 @@ export async function GET(request: NextRequest) {
     }
 
     // Build response map
-    const stats: Record<string, { total: number; unreadMoltbot: number }> = {};
+    // NOTE: Field name changed from 'unreadMoltbot' to 'unreadAgent'
+    // Frontend should use 'unreadAgent' going forward
+    const stats: Record<string, { total: number; unreadAgent: number }> = {};
     
     for (const item of commentCounts) {
-      stats[item._id] = { total: item.total, unreadMoltbot: 0 };
+      stats[item._id] = { total: item.total, unreadAgent: 0 };
     }
     
     for (const item of unreadCounts) {
       if (stats[item._id]) {
-        stats[item._id].unreadMoltbot = item.count;
+        stats[item._id].unreadAgent = item.count;
       } else {
-        stats[item._id] = { total: item.count, unreadMoltbot: item.count };
+        stats[item._id] = { total: item.count, unreadAgent: item.count };
       }
     }
 

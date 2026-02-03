@@ -11,7 +11,9 @@ export const PriorityConfig: Record<Priority, { label: string; color: string; ic
 };
 
 // Actor types for tracking who did what
-export type Actor = 'mike' | 'moltbot' | 'system' | 'api';
+// 'agent' is the canonical key for the AI agent.
+// 'moltbot' is kept for backwards compatibility with existing MongoDB data.
+export type Actor = 'mike' | 'agent' | 'moltbot' | 'system' | 'api';
 
 // Checklist item for subtasks (supports nesting)
 export interface ChecklistItem {
@@ -49,9 +51,10 @@ export interface User {
 }
 
 // Hardcoded users for MVP (can expand to DB later)
+// 'agent' is the canonical key; 'moltbot' kept for legacy data compatibility
 export const USERS: User[] = [
   { id: 'mike', name: 'Mike', color: '#3B82F6' },
-  { id: 'moltbot', name: 'Moltbot', avatar: '🔥', color: '#F97316' },
+  { id: 'agent', name: 'AI Assistant', avatar: '🤖', color: '#F97316' },
 ];
 
 export interface Task {

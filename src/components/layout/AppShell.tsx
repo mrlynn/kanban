@@ -35,15 +35,15 @@ export function AppShell({ children }: AppShellProps) {
         if (res.ok) {
           const data = await res.json();
           const messages = data.messages || [];
-          // Count moltbot messages we haven't seen
-          const newMoltbotMessages = messages.filter(
+          // Count agent messages we haven't seen (handles legacy 'moltbot' author too)
+          const newAgentMessages = messages.filter(
             (m: { author: string; createdAt: string }) =>
-              m.author === 'moltbot' &&
+              (m.author === 'agent' || m.author === 'moltbot') &&
               lastCheckedRef.current &&
               new Date(m.createdAt) > new Date(lastCheckedRef.current)
           );
-          if (newMoltbotMessages.length > 0) {
-            setUnreadCount((prev) => prev + newMoltbotMessages.length);
+          if (newAgentMessages.length > 0) {
+            setUnreadCount((prev) => prev + newAgentMessages.length);
           }
           if (messages.length > 0) {
             lastCheckedRef.current = messages[messages.length - 1].createdAt;

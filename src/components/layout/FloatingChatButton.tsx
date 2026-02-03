@@ -29,7 +29,7 @@ export function FloatingChatButton({ open, onClick, unreadCount = 0 }: FloatingC
 
   return (
     <Zoom in={mounted}>
-      <Tooltip title={open ? 'Close chat' : 'Chat with Moltbot'} placement="left">
+      <Tooltip title={open ? 'Close chat' : 'Chat with AI Assistant'} placement="left">
         <Fab
           onClick={onClick}
           sx={{

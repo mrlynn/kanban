@@ -30,7 +30,7 @@ interface KanbanColumnProps {
   onBulkArchive?: (columnId: string) => void;
   collapsible?: boolean;
   defaultVisibleCount?: number;
-  commentStats?: Record<string, { total: number; unreadMoltbot: number }>;
+  commentStats?: Record<string, { total: number; unreadAgent: number }>;
   isMobile?: boolean;
 }
 
@@ -212,7 +212,7 @@ export function KanbanColumn({
                 onOpenDetails={onOpenDetails}
                 onArchive={onArchive}
                 commentCount={stats?.total || 0}
-                unreadMoltbotComments={stats?.unreadMoltbot || 0}
+                unreadAgentComments={stats?.unreadAgent || 0}
                 isMobile={isMobile}
               />
             );
