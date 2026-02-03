@@ -142,13 +142,84 @@ export interface TenantUser {
 }
 
 /**
+ * Tenant membership role
+ */
+export type TenantRole = 'owner' | 'admin' | 'member';
+
+/**
  * Tenant membership
  */
 export interface TenantMembership {
   tenantId: string;
-  role: 'owner' | 'admin' | 'member';
+  role: TenantRole;
   joinedAt: Date;
 }
+
+/**
+ * Tenant invitation - pending email invite to workspace
+ */
+export interface TenantInvitation {
+  _id?: ObjectId;
+  id: string;
+  tenantId: string;
+  email: string;
+  role: 'admin' | 'member';  // Can't invite as owner
+  token: string;             // Secure token for accept link
+  expiresAt: Date;
+  createdAt: Date;
+  createdBy: string;         // User ID who sent invite
+  acceptedAt?: Date;
+  declinedAt?: Date;
+}
+
+/**
+ * Tenant team member view for UI
+ */
+export interface TenantTeamMember {
+  id: string;
+  email: string;
+  name: string;
+  avatar?: string;
+  role: TenantRole;
+  status: 'active' | 'pending';
+  joinedAt: Date;
+  // Only for pending
+  invitationId?: string;
+  expiresAt?: Date;
+}
+
+/**
+ * Tenant role permissions
+ */
+export const TENANT_ROLE_PERMISSIONS: Record<TenantRole, {
+  canManageMembers: boolean;
+  canManageAdmins: boolean;
+  canManageBilling: boolean;
+  canDeleteWorkspace: boolean;
+  canAccessAllBoards: boolean;
+}> = {
+  owner: {
+    canManageMembers: true,
+    canManageAdmins: true,
+    canManageBilling: true,
+    canDeleteWorkspace: true,
+    canAccessAllBoards: true,
+  },
+  admin: {
+    canManageMembers: true,
+    canManageAdmins: false,
+    canManageBilling: false,
+    canDeleteWorkspace: false,
+    canAccessAllBoards: true,
+  },
+  member: {
+    canManageMembers: false,
+    canManageAdmins: false,
+    canManageBilling: false,
+    canDeleteWorkspace: false,
+    canAccessAllBoards: true,  // Access as editor
+  },
+};
 
 /**
  * API Key (stored in DB)
