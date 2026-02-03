@@ -5,6 +5,7 @@ import GoogleProvider from 'next-auth/providers/google';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { getDb } from './mongodb';
 import { BoardInvitation, BoardMember } from '@/types/team';
+import { TenantInvitation, TenantUser } from '@/types/tenant';
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -51,33 +52,57 @@ if (isDev) {
 }
 
 /**
- * Check if an email has been invited to any board or is already a board member
+ * Check if an email has been invited to any board/tenant or is already a member
  */
 async function hasInvitationOrMembership(email: string): Promise<boolean> {
   try {
     const db = await getDb();
     const normalizedEmail = email.toLowerCase();
     
-    // Check for pending invitation
-    const invitation = await db.collection<BoardInvitation>('boardInvitations').findOne({
+    // Check for pending board invitation
+    const boardInvitation = await db.collection<BoardInvitation>('boardInvitations').findOne({
       email: normalizedEmail,
       acceptedAt: { $exists: false },
       declinedAt: { $exists: false },
       expiresAt: { $gt: new Date() },
     });
     
-    if (invitation) {
+    if (boardInvitation) {
       console.log('[Auth] User has pending board invitation:', normalizedEmail);
       return true;
     }
     
+    // Check for pending tenant/workspace invitation
+    const tenantInvitation = await db.collection<TenantInvitation>('tenantInvitations').findOne({
+      email: normalizedEmail,
+      acceptedAt: { $exists: false },
+      declinedAt: { $exists: false },
+      expiresAt: { $gt: new Date() },
+    });
+    
+    if (tenantInvitation) {
+      console.log('[Auth] User has pending tenant invitation:', normalizedEmail);
+      return true;
+    }
+    
     // Check if already a board member
-    const membership = await db.collection<BoardMember>('boardMembers').findOne({
+    const boardMembership = await db.collection<BoardMember>('boardMembers').findOne({
       email: normalizedEmail,
     });
     
-    if (membership) {
+    if (boardMembership) {
       console.log('[Auth] User is already a board member:', normalizedEmail);
+      return true;
+    }
+    
+    // Check if already a tenant member (user with any membership)
+    const tenantUser = await db.collection<TenantUser>('users').findOne({
+      email: normalizedEmail,
+      'memberships.0': { $exists: true }, // Has at least one membership
+    });
+    
+    if (tenantUser) {
+      console.log('[Auth] User is already a tenant member:', normalizedEmail);
       return true;
     }
     
