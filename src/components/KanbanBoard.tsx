@@ -26,13 +26,14 @@ import {
   useMediaQuery,
   useTheme,
 } from '@mui/material';
-import { Archive } from '@mui/icons-material';
+import { Archive, Share } from '@mui/icons-material';
 import { Board, Task, Column, Priority } from '@/types/kanban';
 import { KanbanColumn } from './KanbanColumn';
 import { TaskCard } from './TaskCard';
 import { TaskDialog } from './TaskDialog';
 import { TaskDetailDialog } from './TaskDetailDialog';
 import { ArchiveDrawer } from './ArchiveDrawer';
+import { ShareDialog } from './ShareDialog';
 import { SearchFilterBar, SearchFilters, defaultFilters } from './SearchFilterBar';
 
 interface KanbanBoardProps {
@@ -79,6 +80,9 @@ export function KanbanBoard({ boardId }: KanbanBoardProps) {
   // Archive drawer state
   const [archiveDrawerOpen, setArchiveDrawerOpen] = useState(false);
   const [archivedCount, setArchivedCount] = useState(0);
+  
+  // Share dialog state
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
   
   // Search & Filter state
   const [filters, setFilters] = useState<SearchFilters>(defaultFilters);
@@ -493,18 +497,27 @@ export function KanbanBoard({ boardId }: KanbanBoardProps) {
             </Typography>
           )}
         </Box>
-        <Button
-          variant="outlined"
-          startIcon={
-            <Badge badgeContent={archivedCount} color="primary" max={99}>
-              <Archive />
-            </Badge>
-          }
-          onClick={() => setArchiveDrawerOpen(true)}
-          sx={{ minWidth: 120 }}
-        >
-          Archive
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={<Share />}
+            onClick={() => setShareDialogOpen(true)}
+          >
+            Share
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={
+              <Badge badgeContent={archivedCount} color="primary" max={99}>
+                <Archive />
+              </Badge>
+            }
+            onClick={() => setArchiveDrawerOpen(true)}
+            sx={{ minWidth: 120 }}
+          >
+            Archive
+          </Button>
+        </Box>
       </Box>
       
       {/* Search & Filter Bar */}
@@ -614,6 +627,7 @@ export function KanbanBoard({ boardId }: KanbanBoardProps) {
       <TaskDialog
         open={dialogOpen}
         task={editingTask}
+        boardId={boardId}
         onClose={() => setDialogOpen(false)}
         onSave={handleSaveTask}
       />
@@ -651,6 +665,13 @@ export function KanbanBoard({ boardId }: KanbanBoardProps) {
         onDelete={handleDeleteTask}
         onBulkArchive={handleBulkArchive}
         doneColumnId={doneColumnId}
+      />
+
+      <ShareDialog
+        open={shareDialogOpen}
+        onClose={() => setShareDialogOpen(false)}
+        boardId={boardId}
+        boardName={board.name}
       />
     </Box>
   );

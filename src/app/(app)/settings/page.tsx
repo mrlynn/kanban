@@ -49,6 +49,11 @@ import {
   ArrowForward,
   CreditCard,
   Rocket,
+  Group,
+  PersonAdd,
+  AdminPanelSettings,
+  Person,
+  Schedule,
 } from '@mui/icons-material';
 
 interface Tenant {
@@ -98,6 +103,18 @@ interface Automation {
   triggerCount: number;
   createdAt: string;
   project?: { name: string };
+}
+
+interface TeamMember {
+  id: string;
+  email: string;
+  name: string;
+  avatar?: string;
+  role: 'owner' | 'admin' | 'member';
+  status: 'active' | 'pending';
+  joinedAt: string;
+  invitationId?: string;
+  expiresAt?: string;
 }
 
 const TRIGGER_LABELS: Record<string, string> = {
@@ -157,8 +174,17 @@ export default function SettingsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [boards, setBoards] = useState<Board[]>([]);
   const [automations, setAutomations] = useState<Automation[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [canManageMembers, setCanManageMembers] = useState(false);
+  const [canManageAdmins, setCanManageAdmins] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Team member invite dialog
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<'admin' | 'member'>('member');
+  const [inviting, setInviting] = useState(false);
   
   // Automation dialog
   const [automationDialogOpen, setAutomationDialogOpen] = useState(false);
@@ -191,22 +217,23 @@ export default function SettingsPage() {
   const [showNewKey, setShowNewKey] = useState(false);
   
   // Snackbar
-  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'warning' | 'info' }>({
     open: false,
     message: '',
     severity: 'success',
   });
 
-  // Fetch tenant info, API keys, projects, boards, and automations
+  // Fetch tenant info, API keys, projects, boards, automations, and team members
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [tenantRes, keysRes, projectsRes, boardsRes, automationsRes] = await Promise.all([
+      const [tenantRes, keysRes, projectsRes, boardsRes, automationsRes, membersRes] = await Promise.all([
         fetch('/api/tenant'),
         fetch('/api/tenant/api-keys'),
         fetch('/api/projects'),
         fetch('/api/boards'),
         fetch('/api/automations?includeDisabled=true'),
+        fetch('/api/tenant/members'),
       ]);
       
       if (tenantRes.ok) {
@@ -234,6 +261,13 @@ export default function SettingsPage() {
       if (automationsRes.ok) {
         const data = await automationsRes.json();
         setAutomations(data || []);
+      }
+      
+      if (membersRes.ok) {
+        const data = await membersRes.json();
+        setTeamMembers(data.members || []);
+        setCanManageMembers(data.canManageMembers || false);
+        setCanManageAdmins(data.canManageAdmins || false);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load settings');
@@ -509,6 +543,111 @@ export default function SettingsPage() {
     setAutomationAction('');
   };
 
+  // Invite team member
+  const handleInviteMember = async () => {
+    if (!inviteEmail.trim() || inviting) return;
+    
+    setInviting(true);
+    try {
+      const res = await fetch('/api/tenant/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: inviteEmail.trim(),
+          role: inviteRole,
+        }),
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        // Add pending invitation to list
+        setTeamMembers(prev => [...prev, {
+          id: data.invitation.id,
+          email: data.invitation.email,
+          name: data.invitation.email.split('@')[0],
+          role: data.invitation.role,
+          status: 'pending' as const,
+          joinedAt: new Date().toISOString(),
+          invitationId: data.invitation.id,
+          expiresAt: data.invitation.expiresAt,
+        }]);
+        setInviteDialogOpen(false);
+        setInviteEmail('');
+        setInviteRole('member');
+        setSnackbar({
+          open: true,
+          message: data.emailSent 
+            ? 'Invitation sent successfully' 
+            : 'Invitation created (email could not be sent)',
+          severity: data.emailSent ? 'success' : 'warning',
+        });
+      } else {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to send invitation');
+      }
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: err instanceof Error ? err.message : 'Failed to send invitation',
+        severity: 'error',
+      });
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  // Update member role
+  const handleUpdateMemberRole = async (userId: string, newRole: 'admin' | 'member') => {
+    try {
+      const res = await fetch(`/api/tenant/members/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRole }),
+      });
+      
+      if (res.ok) {
+        setTeamMembers(prev =>
+          prev.map(m => (m.id === userId ? { ...m, role: newRole } : m))
+        );
+        setSnackbar({ open: true, message: 'Role updated', severity: 'success' });
+      } else {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to update role');
+      }
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: err instanceof Error ? err.message : 'Failed to update role',
+        severity: 'error',
+      });
+    }
+  };
+
+  // Remove member
+  const handleRemoveMember = async (userId: string, memberName: string) => {
+    if (!confirm(`Are you sure you want to remove ${memberName} from the workspace?`)) return;
+    
+    try {
+      const res = await fetch(`/api/tenant/members/${userId}`, {
+        method: 'DELETE',
+      });
+      
+      if (res.ok) {
+        setTeamMembers(prev => prev.filter(m => m.id !== userId));
+        setSnackbar({ open: true, message: 'Member removed', severity: 'success' });
+      } else {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to remove member');
+      }
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: err instanceof Error ? err.message : 'Failed to remove member',
+        severity: 'error',
+      });
+    }
+  };
+
   // Usage percentage
   const getUsagePercent = (used: number, limit: number) => {
     if (limit === -1) return 0; // Unlimited
@@ -725,6 +864,197 @@ export default function SettingsPage() {
                   </Typography>
                 )}
               </Box>
+            )}
+          </Paper>
+        </Grid>
+
+        {/* Team Members */}
+        <Grid item xs={12}>
+          <Paper sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Group sx={{ color: 'primary.main' }} />
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  Team Members
+                </Typography>
+              </Box>
+              {canManageMembers && (
+                <Button
+                  startIcon={<PersonAdd />}
+                  variant="contained"
+                  size="small"
+                  onClick={() => setInviteDialogOpen(true)}
+                >
+                  Invite
+                </Button>
+              )}
+            </Box>
+            
+            <Typography color="text.secondary" sx={{ mb: 3 }}>
+              Team members have access to all boards in this workspace.
+            </Typography>
+            
+            {teamMembers.length === 0 ? (
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <Group sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
+                <Typography color="text.secondary">
+                  No team members yet
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Invite people to collaborate on all boards
+                </Typography>
+              </Box>
+            ) : (
+              <List disablePadding>
+                {teamMembers.map((member) => (
+                  <ListItem
+                    key={member.id}
+                    sx={{
+                      bgcolor: alpha('#ffffff', 0.02),
+                      borderRadius: 1,
+                      mb: 1,
+                      border: '1px solid',
+                      borderColor: member.status === 'pending' 
+                        ? alpha('#FFA500', 0.3) 
+                        : alpha('#ffffff', 0.1),
+                      opacity: member.status === 'pending' ? 0.8 : 1,
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1, minWidth: 0 }}>
+                      {/* Avatar placeholder */}
+                      <Box
+                        sx={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: '50%',
+                          bgcolor: member.role === 'owner' 
+                            ? '#F97316' 
+                            : member.role === 'admin' 
+                              ? '#3B82F6' 
+                              : '#6B7280',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'white',
+                          fontWeight: 600,
+                          fontSize: '1rem',
+                        }}
+                      >
+                        {member.name.charAt(0).toUpperCase()}
+                      </Box>
+                      
+                      <ListItemText
+                        primary={
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                            <Typography fontWeight={600} sx={{ 
+                              overflow: 'hidden', 
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}>
+                              {member.name}
+                            </Typography>
+                            <Chip
+                              size="small"
+                              icon={
+                                member.role === 'owner' ? <AdminPanelSettings sx={{ fontSize: 14 }} /> :
+                                member.role === 'admin' ? <AdminPanelSettings sx={{ fontSize: 14 }} /> :
+                                <Person sx={{ fontSize: 14 }} />
+                              }
+                              label={member.role.charAt(0).toUpperCase() + member.role.slice(1)}
+                              sx={{
+                                height: 22,
+                                fontSize: '0.7rem',
+                                bgcolor: member.role === 'owner'
+                                  ? alpha('#F97316', 0.2)
+                                  : member.role === 'admin'
+                                    ? alpha('#3B82F6', 0.2)
+                                    : alpha('#6B7280', 0.2),
+                                color: member.role === 'owner'
+                                  ? '#F97316'
+                                  : member.role === 'admin'
+                                    ? '#3B82F6'
+                                    : '#9CA3AF',
+                              }}
+                            />
+                            {member.status === 'pending' && (
+                              <Chip
+                                size="small"
+                                icon={<Schedule sx={{ fontSize: 14 }} />}
+                                label="Pending"
+                                sx={{
+                                  height: 22,
+                                  fontSize: '0.7rem',
+                                  bgcolor: alpha('#FFA500', 0.2),
+                                  color: '#FFA500',
+                                }}
+                              />
+                            )}
+                          </Box>
+                        }
+                        secondary={
+                          <Typography 
+                            variant="caption" 
+                            color="text.secondary"
+                            sx={{ 
+                              overflow: 'hidden', 
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              display: 'block',
+                            }}
+                          >
+                            {member.email}
+                            {member.status === 'active' && ` • Joined ${new Date(member.joinedAt).toLocaleDateString()}`}
+                            {member.status === 'pending' && member.expiresAt && 
+                              ` • Expires ${new Date(member.expiresAt).toLocaleDateString()}`}
+                          </Typography>
+                        }
+                      />
+                    </Box>
+                    
+                    {canManageMembers && member.role !== 'owner' && (
+                      <ListItemSecondaryAction>
+                        {/* Role change dropdown */}
+                        {(canManageAdmins || member.role !== 'admin') && (
+                          <Tooltip title="Change role">
+                            <IconButton
+                              size="small"
+                              onClick={() => {
+                                const newRole = member.role === 'admin' ? 'member' : 'admin';
+                                handleUpdateMemberRole(member.id, newRole);
+                              }}
+                              sx={{ mr: 0.5 }}
+                            >
+                              {member.role === 'admin' ? (
+                                <Person fontSize="small" />
+                              ) : (
+                                <AdminPanelSettings fontSize="small" />
+                              )}
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        <Tooltip title={member.status === 'pending' ? 'Cancel invitation' : 'Remove from workspace'}>
+                          <IconButton
+                            edge="end"
+                            size="small"
+                            onClick={() => handleRemoveMember(member.id, member.name)}
+                            sx={{ color: 'error.main' }}
+                          >
+                            <Delete fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </ListItemSecondaryAction>
+                    )}
+                  </ListItem>
+                ))}
+              </List>
+            )}
+            
+            {tenant?.plan === 'free' && (
+              <Alert severity="info" sx={{ mt: 2 }}>
+                <Typography variant="body2">
+                  Free plan is limited to 1 member. <a href="/pricing" style={{ color: '#F97316' }}>Upgrade to Team</a> for up to 10 members.
+                </Typography>
+              </Alert>
             )}
           </Paper>
         </Grid>
@@ -1544,6 +1874,59 @@ export default function SettingsPage() {
             disabled={!automationName.trim() || !automationTrigger || !automationAction || creatingAutomation}
           >
             {creatingAutomation ? 'Creating...' : 'Create'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Invite Team Member Dialog */}
+      <Dialog open={inviteDialogOpen} onClose={() => setInviteDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <PersonAdd color="primary" />
+          Invite Team Member
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Invite someone to join your workspace. They'll have access to all boards.
+          </Typography>
+          
+          <TextField
+            autoFocus
+            fullWidth
+            label="Email Address"
+            type="email"
+            placeholder="colleague@example.com"
+            value={inviteEmail}
+            onChange={(e) => setInviteEmail(e.target.value)}
+            sx={{ mb: 2 }}
+          />
+          
+          <TextField
+            select
+            fullWidth
+            label="Role"
+            value={inviteRole}
+            onChange={(e) => setInviteRole(e.target.value as 'admin' | 'member')}
+            SelectProps={{ native: true }}
+            helperText={
+              inviteRole === 'admin' 
+                ? 'Admins can manage team members and access all boards'
+                : 'Members have access to all boards as editors'
+            }
+          >
+            <option value="member">Member</option>
+            {canManageAdmins && <option value="admin">Admin</option>}
+          </TextField>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setInviteDialogOpen(false)} color="inherit">
+            Cancel
+          </Button>
+          <Button
+            onClick={handleInviteMember}
+            variant="contained"
+            disabled={!inviteEmail.trim() || inviting}
+          >
+            {inviting ? 'Sending...' : 'Send Invitation'}
           </Button>
         </DialogActions>
       </Dialog>
