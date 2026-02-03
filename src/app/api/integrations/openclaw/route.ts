@@ -1,14 +1,14 @@
 /**
- * Clawdbot Integration API
+ * OpenClaw Integration API
  * 
- * GET    - Get user's Clawdbot integration
- * POST   - Create/update Clawdbot integration
- * DELETE - Remove Clawdbot integration
+ * GET    - Get user's OpenClaw integration
+ * POST   - Create/update OpenClaw integration
+ * DELETE - Remove OpenClaw integration
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
-import { ClawdbotIntegration } from '@/types/integrations';
+import { OpenClawIntegration } from '@/types/integrations';
 import { requireScope, AuthError } from '@/lib/tenant-auth';
 import crypto from 'crypto';
 
@@ -25,20 +25,37 @@ function generateSecret(): string {
 }
 
 /**
- * GET /api/integrations/clawdbot
- * Get user's Clawdbot integration
+ * Helper to find integration in new or legacy collection
+ */
+async function findIntegration(db: Awaited<ReturnType<typeof getDb>>, tenantId: string, userId: string): Promise<OpenClawIntegration | null> {
+  const filter = { tenantId, userId };
+  
+  const result = await db
+    .collection<OpenClawIntegration>('openclaw_integrations')
+    .findOne(filter);
+  
+  if (result) return result;
+  
+  // Backwards compatibility: check legacy collection
+  return await db
+    .collection<OpenClawIntegration>('openclaw_integrations')
+    .findOne(filter);
+}
+
+/**
+ * GET /api/integrations/openclaw
+ * Get user's OpenClaw integration
  */
 export async function GET(request: NextRequest) {
   try {
     const context = await requireScope(request, 'chat:read');
     const db = await getDb();
 
-    const integration = await db
-      .collection<ClawdbotIntegration>('clawdbot_integrations')
-      .findOne({ 
-        tenantId: context.tenantId,
-        userId: context.userId || context.tenantId, // Fallback to tenantId for API keys
-      });
+    const integration = await findIntegration(
+      db,
+      context.tenantId,
+      context.userId || context.tenantId
+    );
 
     if (!integration) {
       return NextResponse.json({ integration: null });
@@ -65,14 +82,14 @@ export async function GET(request: NextRequest) {
     if (error instanceof AuthError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
-    console.error('Error fetching Clawdbot integration:', error);
+    console.error('Error fetching OpenClaw integration:', error);
     return NextResponse.json({ error: 'Failed to fetch integration' }, { status: 500 });
   }
 }
 
 /**
- * POST /api/integrations/clawdbot
- * Create or update Clawdbot integration
+ * POST /api/integrations/openclaw
+ * Create or update OpenClaw integration
  */
 export async function POST(request: NextRequest) {
   try {
@@ -88,13 +105,11 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = context.userId || context.tenantId;
-    const existing = await db
-      .collection<ClawdbotIntegration>('clawdbot_integrations')
-      .findOne({ tenantId: context.tenantId, userId });
+    const existing = await findIntegration(db, context.tenantId, userId);
 
     if (existing) {
       // Update existing
-      const updates: Partial<ClawdbotIntegration> = {
+      const updates: Partial<OpenClawIntegration> = {
         updatedAt: new Date(),
       };
 
@@ -118,10 +133,18 @@ export async function POST(request: NextRequest) {
         updates.webhookSecret = generateSecret();
       }
 
-      await db.collection<ClawdbotIntegration>('clawdbot_integrations').updateOne(
+      // Try new collection, then legacy
+      const result = await db.collection<OpenClawIntegration>('openclaw_integrations').updateOne(
         { id: existing.id },
         { $set: updates }
       );
+      
+      if (result.matchedCount === 0) {
+        await db.collection<OpenClawIntegration>('openclaw_integrations').updateOne(
+          { id: existing.id },
+          { $set: updates }
+        );
+      }
 
       return NextResponse.json({
         integration: {
@@ -144,8 +167,8 @@ export async function POST(request: NextRequest) {
       const apiKey = generateApiKey();
       const webhookSecret = generateSecret();
 
-      const integration: ClawdbotIntegration = {
-        id: generateId('clawdbot'),
+      const integration: OpenClawIntegration = {
+        id: generateId('openclaw'),
         tenantId: context.tenantId,
         userId,
         enabled: enabled ?? true,
@@ -160,7 +183,7 @@ export async function POST(request: NextRequest) {
         updatedAt: new Date(),
       };
 
-      await db.collection<ClawdbotIntegration>('clawdbot_integrations').insertOne(integration);
+      await db.collection<OpenClawIntegration>('openclaw_integrations').insertOne(integration);
 
       return NextResponse.json({
         integration: {
@@ -180,14 +203,14 @@ export async function POST(request: NextRequest) {
     if (error instanceof AuthError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
-    console.error('Error creating/updating Clawdbot integration:', error);
+    console.error('Error creating/updating OpenClaw integration:', error);
     return NextResponse.json({ error: 'Failed to save integration' }, { status: 500 });
   }
 }
 
 /**
- * DELETE /api/integrations/clawdbot
- * Remove Clawdbot integration
+ * DELETE /api/integrations/openclaw
+ * Remove OpenClaw integration
  */
 export async function DELETE(request: NextRequest) {
   try {
@@ -195,11 +218,17 @@ export async function DELETE(request: NextRequest) {
     const db = await getDb();
 
     const userId = context.userId || context.tenantId;
-    const result = await db
-      .collection<ClawdbotIntegration>('clawdbot_integrations')
+    
+    // Try deleting from both collections
+    const result1 = await db
+      .collection<OpenClawIntegration>('openclaw_integrations')
+      .deleteOne({ tenantId: context.tenantId, userId });
+    
+    const result2 = await db
+      .collection<OpenClawIntegration>('openclaw_integrations')
       .deleteOne({ tenantId: context.tenantId, userId });
 
-    if (result.deletedCount === 0) {
+    if (result1.deletedCount === 0 && result2.deletedCount === 0) {
       return NextResponse.json({ error: 'Integration not found' }, { status: 404 });
     }
 
@@ -208,7 +237,7 @@ export async function DELETE(request: NextRequest) {
     if (error instanceof AuthError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
-    console.error('Error deleting Clawdbot integration:', error);
+    console.error('Error deleting OpenClaw integration:', error);
     return NextResponse.json({ error: 'Failed to delete integration' }, { status: 500 });
   }
 }

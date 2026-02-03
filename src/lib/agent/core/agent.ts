@@ -1,20 +1,24 @@
 /**
- * Moltbot Agent - The AI Teammate
+ * Agent Core - The AI Teammate
  *
- * Core interface for all Moltbot features.
+ * Core interface for all agent features.
  * Handles board analysis, proactive messaging, and context management.
  */
 
 import { getDb } from '@/lib/mongodb';
+import { AGENT_ACTOR } from '@/lib/agent-identity';
 import type { Task, Board } from '@/types/kanban';
 
-export interface MoltbotContext {
+export interface AgentContext {
   userId: string;
   boardId: string;
   tenantId?: string;
   recentTasks?: Task[];
   userPatterns?: UserPatterns;
 }
+
+/** @deprecated Use AgentContext instead */
+export type MoltbotContext = AgentContext;
 
 export interface UserPatterns {
   bestWorkTime?: string;
@@ -54,10 +58,10 @@ function generateMessageId(): string {
   return `msg_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export class MoltbotAgent {
-  private context: MoltbotContext;
+export class AgentCore {
+  private context: AgentContext;
 
-  constructor(context: MoltbotContext) {
+  constructor(context: AgentContext) {
     this.context = context;
   }
 
@@ -75,7 +79,7 @@ export class MoltbotAgent {
       id: messageId,
       tenantId: this.context.tenantId,
       boardId: this.context.boardId,
-      author: 'moltbot',
+      author: AGENT_ACTOR,
       content: message,
       status: 'complete',
       createdAt: new Date(),
@@ -256,3 +260,6 @@ export class MoltbotAgent {
     return result;
   }
 }
+
+/** @deprecated Use AgentCore instead */
+export const MoltbotAgent = AgentCore;

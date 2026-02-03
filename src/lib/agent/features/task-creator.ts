@@ -6,7 +6,8 @@
  */
 
 import { getDb } from '@/lib/mongodb';
-import { MoltbotAgent } from '../core/agent';
+import { AGENT_ACTOR, isAgentActor } from '@/lib/agent-identity';
+import { AgentCore } from '../core/agent';
 import {
   parseTaskIntent,
   formatTaskConfirmation,
@@ -107,7 +108,7 @@ async function createTaskFromIntent(
     dueDate: intent.dueDate,
     createdAt: new Date(),
     updatedAt: new Date(),
-    createdBy: 'moltbot',
+    createdBy: AGENT_ACTOR,
   };
 
   await db.collection('tasks').insertOne(task);
@@ -126,7 +127,7 @@ async function createTaskFromIntent(
     taskTitle: task.title,
     boardId,
     action: 'created',
-    actor: 'moltbot',
+    actor: AGENT_ACTOR,
     timestamp: new Date(),
     details: {
       source: 'chat',
@@ -182,8 +183,8 @@ export async function handleChatMessage(
   boardId: string,
   author: string
 ): Promise<{ taskCreated: boolean; responseMessageId?: string }> {
-  // Only process messages from users (not moltbot)
-  if (author === 'moltbot' || author === 'api' || author === 'system') {
+  // Only process messages from users (not the agent)
+  if (isAgentActor(author) || author === 'api' || author === 'system') {
     return { taskCreated: false };
   }
 
@@ -191,7 +192,7 @@ export async function handleChatMessage(
 
   if (result.created && result.confirmation) {
     // Post confirmation message
-    const agent = new MoltbotAgent({
+    const agent = new AgentCore({
       userId: author,
       boardId,
       tenantId,

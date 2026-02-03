@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
         createdAt: apiKey.createdAt,
       },
       setup: {
-        instructions: 'Add this to your Clawdbot config:',
+        instructions: 'Add this to your OpenClaw config:',
         config: {
           channels: {
             moltboard: {

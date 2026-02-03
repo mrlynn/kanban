@@ -1,17 +1,43 @@
 /**
- * Clawdbot Integration Test API
+ * OpenClaw Integration Test API
  * 
- * POST - Send a test message to user's Clawdbot
+ * POST - Send a test message to user's OpenClaw
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
-import { ClawdbotIntegration } from '@/types/integrations';
+import { OpenClawIntegration } from '@/types/integrations';
 import { requireScope, AuthError } from '@/lib/tenant-auth';
-import { signPayload } from '@/lib/clawdbot-webhook';
+import { signPayload } from '@/lib/openclaw-webhook';
 
 /**
- * POST /api/integrations/clawdbot/test
+ * Helper to find integration in new or legacy collection
+ */
+async function findIntegration(db: Awaited<ReturnType<typeof getDb>>, tenantId: string, userId: string): Promise<OpenClawIntegration | null> {
+  const filter = { tenantId, userId };
+  const result = await db.collection<OpenClawIntegration>('openclaw_integrations').findOne(filter);
+  if (result) return result;
+  return await db.collection<OpenClawIntegration>('openclaw_integrations').findOne(filter);
+}
+
+/**
+ * Helper to update integration in the correct collection
+ */
+async function updateIntegration(db: Awaited<ReturnType<typeof getDb>>, integrationId: string, update: any): Promise<void> {
+  const result = await db.collection<OpenClawIntegration>('openclaw_integrations').updateOne(
+    { id: integrationId },
+    update
+  );
+  if (result.matchedCount === 0) {
+    await db.collection<OpenClawIntegration>('openclaw_integrations').updateOne(
+      { id: integrationId },
+      update
+    );
+  }
+}
+
+/**
+ * POST /api/integrations/openclaw/test
  * Send a test message to verify the connection
  */
 export async function POST(request: NextRequest) {
@@ -20,9 +46,7 @@ export async function POST(request: NextRequest) {
     const db = await getDb();
 
     const userId = context.userId || context.tenantId;
-    const integration = await db
-      .collection<ClawdbotIntegration>('clawdbot_integrations')
-      .findOne({ tenantId: context.tenantId, userId });
+    const integration = await findIntegration(db, context.tenantId, userId);
 
     if (!integration) {
       return NextResponse.json({ error: 'No integration configured' }, { status: 404 });
@@ -41,7 +65,7 @@ export async function POST(request: NextRequest) {
       type: 'message' as const,
       message: {
         id: `test_${Date.now()}`,
-        content: '🔗 Connection test from Moltboard! If you see this, your Clawdbot integration is working.',
+        content: '🔗 Connection test from Moltboard! If you see this, your OpenClaw integration is working.',
         author: 'moltboard',
         createdAt: new Date().toISOString(),
       },
@@ -77,18 +101,14 @@ export async function POST(request: NextRequest) {
       if (!response.ok) {
         const errorText = await response.text().catch(() => 'Unknown error');
         
-        // Update integration status
-        await db.collection<ClawdbotIntegration>('clawdbot_integrations').updateOne(
-          { id: integration.id },
-          {
-            $set: {
-              status: 'error',
-              lastErrorAt: new Date(),
-              lastError: `HTTP ${response.status}: ${errorText.slice(0, 200)}`,
-              updatedAt: new Date(),
-            },
-          }
-        );
+        await updateIntegration(db, integration.id, {
+          $set: {
+            status: 'error',
+            lastErrorAt: new Date(),
+            lastError: `HTTP ${response.status}: ${errorText.slice(0, 200)}`,
+            updatedAt: new Date(),
+          },
+        });
 
         return NextResponse.json({
           success: false,
@@ -98,18 +118,14 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Update integration status to connected
-      await db.collection<ClawdbotIntegration>('clawdbot_integrations').updateOne(
-        { id: integration.id },
-        {
-          $set: {
-            status: 'connected',
-            lastConnectedAt: new Date(),
-            lastError: undefined,
-            updatedAt: new Date(),
-          },
-        }
-      );
+      await updateIntegration(db, integration.id, {
+        $set: {
+          status: 'connected',
+          lastConnectedAt: new Date(),
+          lastError: undefined,
+          updatedAt: new Date(),
+        },
+      });
 
       return NextResponse.json({
         success: true,
@@ -120,18 +136,14 @@ export async function POST(request: NextRequest) {
       const latencyMs = Date.now() - startTime;
       const errorMessage = fetchError instanceof Error ? fetchError.message : 'Unknown error';
 
-      // Update integration status
-      await db.collection<ClawdbotIntegration>('clawdbot_integrations').updateOne(
-        { id: integration.id },
-        {
-          $set: {
-            status: 'error',
-            lastErrorAt: new Date(),
-            lastError: errorMessage,
-            updatedAt: new Date(),
-          },
-        }
-      );
+      await updateIntegration(db, integration.id, {
+        $set: {
+          status: 'error',
+          lastErrorAt: new Date(),
+          lastError: errorMessage,
+          updatedAt: new Date(),
+        },
+      });
 
       return NextResponse.json({
         success: false,
@@ -144,7 +156,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof AuthError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
-    console.error('Error testing Clawdbot integration:', error);
+    console.error('Error testing OpenClaw integration:', error);
     return NextResponse.json({ error: 'Failed to test integration' }, { status: 500 });
   }
 }

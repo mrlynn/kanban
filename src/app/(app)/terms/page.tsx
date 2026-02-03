@@ -40,7 +40,7 @@ export default function TermsPage() {
         </Typography>
         <Box component="ul" sx={{ mb: 3 }}>
           <li>Task boards and project management features</li>
-          <li>AI-powered assistant (Moltbot) using Anthropic Claude</li>
+          <li>AI-powered assistant using Anthropic Claude</li>
           <li>Collaboration and sharing capabilities</li>
           <li>Integration with third-party services</li>
         </Box>
@@ -81,10 +81,10 @@ export default function TermsPage() {
         </Box>
 
         <Typography variant="h5" gutterBottom sx={{ mt: 4 }}>
-          5. AI Usage and Moltbot
+          5. AI Usage
         </Typography>
         <Typography paragraph>
-          When using Moltbot:
+          When using the AI assistant:
         </Typography>
         <Box component="ul" sx={{ mb: 3 }}>
           <li>AI responses are generated using Anthropic Claude</li>

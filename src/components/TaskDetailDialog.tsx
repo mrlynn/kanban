@@ -55,9 +55,10 @@ interface TaskDetailDialogProps {
   columnNames: Record<string, string>;
 }
 
-const actorConfig: Record<Actor, { name: string; color: string; avatar: string }> = {
+const actorConfig: Record<string, { name: string; color: string; avatar: string }> = {
   mike: { name: 'Mike', color: '#3B82F6', avatar: 'M' },
-  moltbot: { name: 'Moltbot', color: '#F97316', avatar: '🔥' },
+  agent: { name: 'AI Assistant', color: '#F97316', avatar: '🤖' },
+  moltbot: { name: 'AI Assistant', color: '#F97316', avatar: '🤖' }, // Legacy alias
   system: { name: 'System', color: '#6B7280', avatar: 'S' },
   api: { name: 'API', color: '#8B5CF6', avatar: 'A' },
 };

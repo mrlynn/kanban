@@ -2,10 +2,11 @@
  * Stuck Task Detection Feature
  *
  * Monitors tasks and alerts when they've been stagnant too long.
- * This is a key "proactive" feature - Moltbot notices problems before you do.
+ * This is a key "proactive" feature - the agent notices problems before you do.
  */
 
-import { MoltbotAgent, StuckTask } from '../core/agent';
+import { AgentCore, StuckTask } from '../core/agent';
+import { AGENT_ACTOR } from '@/lib/agent-identity';
 import { getDb } from '@/lib/mongodb';
 
 export interface StuckDetectionResult {
@@ -36,7 +37,7 @@ export async function detectAndAlertStuckTasks(): Promise<StuckDetectionResult> 
 
   for (const boardId of boardIds) {
     try {
-      const agent = new MoltbotAgent({
+      const agent = new AgentCore({
         userId: 'mike',
         boardId: boardId as string,
       });
@@ -90,7 +91,7 @@ async function hasRecentAlert(
   const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
   const recentAlert = await db.collection('chats').findOne({
-    author: 'moltbot',
+    author: { $in: [AGENT_ACTOR, 'moltbot'] },
     'metadata.type': 'stuck-task-alert',
     'metadata.taskId': taskId,
     createdAt: { $gt: oneDayAgo },
@@ -132,7 +133,7 @@ export async function getStuckTasksSummary(boardId: string): Promise<{
   stuckTasks: StuckTask[];
   totalInProgress: number;
 }> {
-  const agent = new MoltbotAgent({
+  const agent = new AgentCore({
     userId: 'mike',
     boardId,
   });

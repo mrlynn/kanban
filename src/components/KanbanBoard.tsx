@@ -66,7 +66,7 @@ export function KanbanBoard({ boardId }: KanbanBoardProps) {
   const [activeColumnIndex, setActiveColumnIndex] = useState(0);
   
   // Comment stats for notifications
-  const [commentStats, setCommentStats] = useState<Record<string, { total: number; unreadMoltbot: number }>>({});
+  const [commentStats, setCommentStats] = useState<Record<string, { total: number; unreadAgent: number }>>({});
   
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -362,7 +362,7 @@ export function KanbanBoard({ boardId }: KanbanBoardProps) {
     setCommentStats(prev => {
       const updated = { ...prev };
       if (updated[task.id]) {
-        updated[task.id] = { ...updated[task.id], unreadMoltbot: 0 };
+        updated[task.id] = { ...updated[task.id], unreadAgent: 0 };
       }
       return updated;
     });

@@ -234,7 +234,7 @@ export interface TenantApiKey {
   keyPrefix: string;           // First 12 chars for display: "moltboard_sk_Fg4S..."
   
   // Metadata
-  name: string;                // "My Clawdbot", "Production Bot"
+  name: string;                // "My OpenClaw", "Production Bot"
   scopes: ApiKeyScope[];
   
   // Tracking

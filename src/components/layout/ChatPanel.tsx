@@ -25,9 +25,10 @@ import { Actor } from '@/types/kanban';
 
 const PANEL_WIDTH = 400;
 
-const actorConfig: Record<Actor, { name: string; color: string; avatar: React.ReactNode }> = {
+const actorConfig: Record<string, { name: string; color: string; avatar: React.ReactNode }> = {
   mike: { name: 'Mike', color: '#3B82F6', avatar: <Person fontSize="small" /> },
-  moltbot: { name: 'Moltbot', color: '#F97316', avatar: '🔥' },
+  agent: { name: 'AI Assistant', color: '#F97316', avatar: '🤖' },
+  moltbot: { name: 'AI Assistant', color: '#F97316', avatar: '🤖' }, // Legacy alias
   system: { name: 'System', color: '#6B7280', avatar: 'S' },
   api: { name: 'API', color: '#8B5CF6', avatar: 'A' },
 };
@@ -179,7 +180,7 @@ export function ChatPanel({ open, onClose }: ChatPanelProps) {
           </Avatar>
           <Box sx={{ flex: 1 }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-              Moltbot
+              AI Assistant
             </Typography>
             <Typography variant="caption" color="text.secondary">
               Your AI Co-founder
@@ -211,7 +212,7 @@ export function ChatPanel({ open, onClose }: ChatPanelProps) {
             <Box sx={{ textAlign: 'center', py: 8, color: 'text.secondary' }}>
               <Typography variant="h1" sx={{ fontSize: 48, mb: 2 }}>👋</Typography>
               <Typography variant="body1" sx={{ mb: 1 }}>
-                Hey! I'm Moltbot.
+                Hey! I'm your AI assistant.
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Ask me anything or tell me what you need.
@@ -370,7 +371,7 @@ export function ChatPanel({ open, onClose }: ChatPanelProps) {
             fullWidth
             multiline
             maxRows={4}
-            placeholder="Message Moltbot..."
+            placeholder="Message AI Assistant..."
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             onKeyDown={(e) => {

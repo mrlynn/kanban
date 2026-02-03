@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Moltboard',
-  description: 'Task management powered by Moltbot 🔥',
+  description: 'Task management powered by AI 🤖',
   icons: {
     icon: '/favicon.ico',
     apple: '/logo.png',

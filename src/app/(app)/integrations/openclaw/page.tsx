@@ -60,7 +60,7 @@ const STATUS_CONFIG = {
   error: { icon: Error, color: 'error', label: 'Error' },
 };
 
-export default function ClawdbotIntegrationPage() {
+export default function OpenClawIntegrationPage() {
   const [integration, setIntegration] = useState<Integration | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -92,7 +92,7 @@ export default function ClawdbotIntegrationPage() {
   // Fetch integration
   const fetchIntegration = useCallback(async () => {
     try {
-      const res = await fetch('/api/integrations/clawdbot');
+      const res = await fetch('/api/integrations/openclaw');
       if (res.ok) {
         const data = await res.json();
         setIntegration(data.integration);
@@ -120,7 +120,7 @@ export default function ClawdbotIntegrationPage() {
 
     setSaving(true);
     try {
-      const res = await fetch('/api/integrations/clawdbot', {
+      const res = await fetch('/api/integrations/openclaw', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ webhookUrl: webhookUrl.trim() }),
@@ -162,7 +162,7 @@ export default function ClawdbotIntegrationPage() {
     
     setSaving(true);
     try {
-      const res = await fetch('/api/integrations/clawdbot', {
+      const res = await fetch('/api/integrations/openclaw', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ regenerateApiKey: true }),
@@ -187,7 +187,7 @@ export default function ClawdbotIntegrationPage() {
     setTestResult(null);
     
     try {
-      const res = await fetch('/api/integrations/clawdbot/test', { method: 'POST' });
+      const res = await fetch('/api/integrations/openclaw/test', { method: 'POST' });
       const data = await res.json();
       
       setTestResult({
@@ -210,10 +210,10 @@ export default function ClawdbotIntegrationPage() {
 
   // Delete integration
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to disconnect Clawdbot?')) return;
+    if (!confirm('Are you sure you want to disconnect OpenClaw?')) return;
     
     try {
-      const res = await fetch('/api/integrations/clawdbot', { method: 'DELETE' });
+      const res = await fetch('/api/integrations/openclaw', { method: 'DELETE' });
       if (res.ok) {
         setIntegration(null);
         setWebhookUrl('');
@@ -264,7 +264,7 @@ export default function ClawdbotIntegrationPage() {
         </Box>
         <Box sx={{ flex: 1 }}>
           <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
-            Clawdbot Integration
+            OpenClaw Integration
           </Typography>
           <Typography color="text.secondary" sx={{ mb: 2 }}>
             Connect your personal AI assistant to manage tasks with natural language commands.
@@ -318,7 +318,7 @@ export default function ClawdbotIntegrationPage() {
           {newApiKey && (
             <Box sx={{ mb: 1 }}>
               <Typography variant="caption" sx={{ display: 'block', mb: 0.5 }}>
-                API Key (for your Clawdbot config):
+                API Key (for your OpenClaw config):
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <code style={{ fontSize: '0.75rem', wordBreak: 'break-all' }}>
@@ -358,20 +358,20 @@ export default function ClawdbotIntegrationPage() {
       {/* Main Content */}
       <Paper sx={{ p: 4, mb: 3 }}>
         <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
-          {integration ? 'Connection Settings' : 'Connect Your Clawdbot'}
+          {integration ? 'Connection Settings' : 'Connect Your OpenClaw'}
         </Typography>
 
         {/* Webhook URL */}
         <Box sx={{ mb: 3 }}>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Your Clawdbot Webhook URL
+            Your OpenClaw Webhook URL
           </Typography>
           <TextField
             fullWidth
             placeholder="https://your-server:18789/webhook/moltboard"
             value={webhookUrl}
             onChange={(e) => setWebhookUrl(e.target.value)}
-            helperText="The URL where Moltboard will send messages to your Clawdbot"
+            helperText="The URL where Moltboard will send messages to your OpenClaw"
           />
         </Box>
 
@@ -472,7 +472,7 @@ export default function ClawdbotIntegrationPage() {
         <Stepper orientation="vertical" sx={{ mt: 2 }}>
           <Step active expanded>
             <StepLabel>
-              <Typography fontWeight={600}>Enter your Clawdbot webhook URL above</Typography>
+              <Typography fontWeight={600}>Enter your OpenClaw webhook URL above</Typography>
             </StepLabel>
             <StepContent>
               <Typography variant="body2" color="text.secondary">
@@ -483,7 +483,7 @@ export default function ClawdbotIntegrationPage() {
 
           <Step active expanded>
             <StepLabel>
-              <Typography fontWeight={600}>Add Moltboard to your Clawdbot config</Typography>
+              <Typography fontWeight={600}>Add Moltboard to your OpenClaw config</Typography>
             </StepLabel>
             <StepContent>
               <Box
@@ -529,11 +529,11 @@ export default function ClawdbotIntegrationPage() {
 
           <Step active expanded>
             <StepLabel>
-              <Typography fontWeight={600}>Restart your Clawdbot gateway</Typography>
+              <Typography fontWeight={600}>Restart your OpenClaw gateway</Typography>
             </StepLabel>
             <StepContent>
               <Typography variant="body2" color="text.secondary">
-                Run <code>clawdbot gateway restart</code> to apply the changes.
+                Run <code>openclaw gateway restart</code> to apply the changes.
               </Typography>
             </StepContent>
           </Step>
@@ -544,7 +544,7 @@ export default function ClawdbotIntegrationPage() {
             </StepLabel>
             <StepContent>
               <Typography variant="body2" color="text.secondary">
-                Click "Test Connection" above to verify everything is working.
+                Click &quot;Test Connection&quot; above to verify everything is working.
               </Typography>
             </StepContent>
           </Step>
@@ -554,8 +554,8 @@ export default function ClawdbotIntegrationPage() {
 
         <Typography variant="body2" color="text.secondary">
           Need help? Check the{' '}
-          <Link href="https://docs.clawd.bot" target="_blank" rel="noopener">
-            Clawdbot documentation
+          <Link href="https://docs.openclaw.ai" target="_blank" rel="noopener">
+            OpenClaw documentation
           </Link>{' '}
           or reach out on{' '}
           <Link href="https://discord.com/invite/clawd" target="_blank" rel="noopener">

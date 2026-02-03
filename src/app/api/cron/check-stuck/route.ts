@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { detectAndAlertStuckTasks } from '@/lib/moltbot/features/stuck-detector';
+import { detectAndAlertStuckTasks } from '@/lib/agent/features/stuck-detector';
 
 /**
  * Stuck Task Detection Cron Job

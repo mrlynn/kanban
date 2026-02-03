@@ -33,8 +33,7 @@ export default function PrivacyPage() {
             you create within Moltboard.
           </li>
           <li>
-            <strong>Chat Messages:</strong> Messages you send to Moltbot and responses generated
-            by the AI assistant.
+            <strong>Chat Messages:</strong> Messages you send to your AI assistant and responses generated.
           </li>
           <li>
             <strong>Usage Data:</strong> Activity logs, timestamps, and interaction patterns to
@@ -50,7 +49,7 @@ export default function PrivacyPage() {
         </Typography>
         <Box component="ul" sx={{ mb: 3 }}>
           <li>Provide and maintain the Moltboard service</li>
-          <li>Generate AI-powered insights and assistance through Moltbot</li>
+          <li>Generate AI-powered insights and assistance through your AI assistant</li>
           <li>Personalize your experience based on your preferences</li>
           <li>Improve and optimize our features and performance</li>
           <li>Send important service updates and notifications</li>
@@ -58,17 +57,17 @@ export default function PrivacyPage() {
         </Box>
 
         <Typography variant="h5" gutterBottom sx={{ mt: 4 }}>
-          3. AI Processing and Moltbot
+          3. AI Processing
         </Typography>
         <Typography paragraph>
-          Moltbot is powered by Claude (Anthropic AI). When you interact with Moltbot:
+          Your AI assistant is powered by Claude (Anthropic AI). When you interact with your AI assistant:
         </Typography>
         <Box component="ul" sx={{ mb: 3 }}>
           <li>Your messages and task context are sent to Anthropic&apos;s API for processing</li>
           <li>Anthropic processes this data according to their privacy policy</li>
           <li>We store chat history in our database to maintain conversation context</li>
           <li>You can delete chat messages at any time from the chat panel</li>
-          <li>You can disable Moltbot&apos;s memory feature in Settings</li>
+          <li>You can disable the AI assistant&apos;s memory feature in Settings</li>
         </Box>
 
         <Typography variant="h5" gutterBottom sx={{ mt: 4 }}>

@@ -87,7 +87,7 @@ export async function getTenantActivities(tenantId: string, limit = 100): Promis
  */
 export function detectActor(apiKey?: string | null, forcedActor?: string): Actor {
   // Allow forcing actor for testing/flexibility
-  if (forcedActor && ['mike', 'moltbot', 'system', 'api'].includes(forcedActor)) {
+  if (forcedActor && ['mike', 'agent', 'moltbot', 'system', 'api'].includes(forcedActor)) {
     return forcedActor as Actor;
   }
   // Session auth or API key without explicit actor = Mike (owner)

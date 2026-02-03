@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateDailyBriefings } from '@/lib/moltbot/features/briefing';
+import { generateDailyBriefings } from '@/lib/agent/features/briefing';
 
 /**
  * Daily Briefing Cron Job
  *
  * POST /api/cron/daily-briefing
  *
- * Generates and posts Moltbot daily briefings to all active boards.
+ * Generates and posts daily briefings to all active boards.
  * Designed to run at 8am daily via Vercel Cron.
  *
  * Security:
