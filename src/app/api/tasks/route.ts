@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
 import { Task } from '@/types/kanban';
-import { requireScope, AuthError } from '@/lib/tenant-auth';
-import { logActivity, detectActor } from '@/lib/activity';
+import { requireAuth, requireScope, AuthError } from '@/lib/tenant-auth';
+import { getBoardAccess, requireBoardAccess, BoardAccessError } from '@/lib/board-access';
+import { logActivity } from '@/lib/activity';
 import crypto from 'crypto';
 
 function generateId(prefix: string): string {
@@ -12,7 +13,7 @@ function generateId(prefix: string): string {
 // GET tasks (optionally filtered by boardId)
 export async function GET(request: NextRequest) {
   try {
-    const context = await requireScope(request, 'tasks:read');
+    const context = await requireAuth(request);
     
     const { searchParams } = new URL(request.url);
     const boardId = searchParams.get('boardId');
@@ -31,9 +32,20 @@ export async function GET(request: NextRequest) {
     
     const db = await getDb();
     
-    // Build query - always filter by tenant
-    const query: Record<string, unknown> = { tenantId: context.tenantId };
-    if (boardId) query.boardId = boardId;
+    // Build base query
+    const query: Record<string, unknown> = {};
+    
+    // If boardId provided, check board access
+    if (boardId) {
+      const access = await getBoardAccess(boardId, context);
+      if (!access) {
+        return NextResponse.json({ error: 'Board not found' }, { status: 404 });
+      }
+      query.boardId = boardId;
+    } else {
+      // No boardId - return tasks from user's tenant only
+      query.tenantId = context.tenantId;
+    }
     
     // Text search (title and description)
     if (q) {
@@ -121,7 +133,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(tasks);
   } catch (error) {
     if (error instanceof AuthError) {
-      return Response.json({ error: error.message }, { status: error.status });
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    if (error instanceof BoardAccessError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
     }
     console.error('Error fetching tasks:', error);
     return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 });
@@ -131,7 +146,7 @@ export async function GET(request: NextRequest) {
 // POST create new task
 export async function POST(request: NextRequest) {
   try {
-    const context = await requireScope(request, 'tasks:write');
+    const context = await requireAuth(request);
     
     const { title, description, columnId, boardId, labels, dueDate, priority, assigneeId } = await request.json();
     
@@ -142,25 +157,26 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // Check board access - need editor role to create tasks
+    const access = await requireBoardAccess(boardId, context, 'editor');
+    
     const db = await getDb();
     
-    // Verify board belongs to tenant
-    const board = await db.collection('boards').findOne({ 
-      id: boardId, 
-      tenantId: context.tenantId 
-    });
+    // Get the board to get its tenantId
+    const board = await db.collection('boards').findOne({ id: boardId });
     if (!board) {
       return NextResponse.json({ error: 'Board not found' }, { status: 404 });
     }
     
-    // Detect actor
+    // Detect actor - for now, use 'mike' for session auth and 'api' for API keys
+    // TODO: Support dynamic user actors when we have proper user IDs
     const actor = context.type === 'apiKey' ? 'api' : 'mike';
     
     // Get the highest order in this column
     const lastTask = await db
       .collection<Task>('tasks')
       .findOne(
-        { tenantId: context.tenantId, columnId }, 
+        { boardId, columnId }, 
         { sort: { order: -1 } }
       );
     
@@ -168,7 +184,7 @@ export async function POST(request: NextRequest) {
     
     const task: Task = {
       id: generateId('task'),
-      tenantId: context.tenantId,
+      tenantId: board.tenantId, // Use board's tenant, not user's tenant
       title,
       description,
       columnId,
@@ -185,15 +201,15 @@ export async function POST(request: NextRequest) {
     
     await db.collection<Task>('tasks').insertOne(task);
     
-    // Update tenant usage
+    // Update tenant usage (board owner's tenant)
     await db.collection('tenants').updateOne(
-      { id: context.tenantId },
+      { id: board.tenantId },
       { $inc: { 'usage.tasks': 1 } }
     );
     
     // Log activity
     await logActivity({
-      tenantId: context.tenantId,
+      tenantId: board.tenantId,
       taskId: task.id,
       boardId,
       action: 'created',
@@ -206,7 +222,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(task, { status: 201 });
   } catch (error) {
     if (error instanceof AuthError) {
-      return Response.json({ error: error.message }, { status: error.status });
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    if (error instanceof BoardAccessError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
     }
     console.error('Error creating task:', error);
     return NextResponse.json({ error: 'Failed to create task' }, { status: 500 });
