@@ -2,7 +2,7 @@
 
 **Task Management, Evolved**
 
-Moltboard is an AI-native task board built for [OpenClaw](https://github.com/openclaw/openclaw) (formerly Moltbot). Manage your projects, collaborate with AI, and watch your tasks transform into shipped work.
+Moltboard is an AI-native task board built for [OpenClaw](https://github.com/openclaw/openclaw). Manage your projects, collaborate with your AI assistant, and watch your tasks transform into shipped work.
 
 [![Built for OpenClaw](https://img.shields.io/badge/Built%20for-OpenClaw-orange?logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMiAyMkgyMkwxMiAyWiIgZmlsbD0iI0Y5NzMxNiIvPgo8L3N2Zz4K)](https://github.com/openclaw/openclaw)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -13,12 +13,12 @@ Moltboard is an AI-native task board built for [OpenClaw](https://github.com/ope
 
 ## ✨ Features
 
-- **🤖 AI-Native** - Built-in chat with Moltbot integration
+- **🤖 AI-Native** - Built-in chat with AI assistant integration
 - **📋 Multiple Boards** - Organize projects with customizable boards
 - **🏷️ Smart Labels** - Categorize with priority, type, and custom labels
 - **💬 Task Comments** - Collaborate with team and AI on tasks
 - **📊 Activity Stream** - Track all changes and updates in real-time
-- **🔔 Notifications** - Unread badges for Moltbot comments
+- **🔔 Notifications** - Unread badges for AI assistant comments
 - **🗄️ Archive** - Keep completed work without clutter
 - **🎨 Modern UI** - Clean Material Design interface
 - **🔐 Secure Auth** - GitHub authentication with NextAuth
@@ -71,24 +71,24 @@ NEXTAUTH_URL=http://localhost:3001
 NEXTAUTH_SECRET=your_random_secret_key
 
 # Moltboard API
-MOLTBOARD_API_KEY=your_api_key_for_moltbot
+MOLTBOARD_API_KEY=your_api_key
 ```
 
 ---
 
-## 🦞 Moltbot Integration
+## 🦞 OpenClaw Integration
 
-Moltboard works seamlessly with OpenClaw/Moltbot as a native communication channel.
+Moltboard works seamlessly with your OpenClaw agent as a native communication channel.
 
 ### Features
 
 - **Task Context** - AI automatically knows which task you're discussing
-- **Board Awareness** - Moltbot understands your project structure
+- **Board Awareness** - Your AI assistant understands your project structure
 - **Real-time Chat** - Integrated chat in every task
 - **Status Tracking** - Track AI processing status (pending → complete)
 - **Activity Logging** - All AI interactions logged automatically
 
-### Setup Moltbot Integration
+### Setup OpenClaw Integration
 
 See [docs/INDEPENDENT_IMPLEMENTATION_GUIDE.md](docs/INDEPENDENT_IMPLEMENTATION_GUIDE.md) for building the OpenClaw channel adapter.
 
@@ -96,7 +96,7 @@ See [docs/INDEPENDENT_IMPLEMENTATION_GUIDE.md](docs/INDEPENDENT_IMPLEMENTATION_G
 1. Run Moltboard (this app)
 2. Build the channel adapter (Node.js service)
 3. Connect to OpenClaw gateway (`ws://127.0.0.1:18789`)
-4. Chat with Moltbot directly from your tasks!
+4. Chat with your AI assistant directly from your tasks!
 
 ---
 
@@ -127,7 +127,7 @@ See [docs/INDEPENDENT_IMPLEMENTATION_GUIDE.md](docs/INDEPENDENT_IMPLEMENTATION_G
 ### For Developers
 - Manage side projects with AI assistance
 - Track bugs and features with context
-- Chat with Moltbot about specific tasks
+- Chat with your AI assistant about specific tasks
 - Archive completed work cleanly
 
 ### For Teams
@@ -256,7 +256,7 @@ npm run lint
 - [x] Comments
 - [x] Activity stream
 - [x] Archive functionality
-- [x] Moltbot chat integration
+- [x] AI assistant chat integration
 
 ### 🚧 Phase 2: Enhanced Features (In Progress)
 - [ ] Due dates with calendar view
@@ -295,10 +295,10 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## 🙏 Acknowledgments
 
 - **[OpenClaw Team](https://github.com/openclaw/openclaw)** - For building the amazing AI assistant platform
-- **[Peter Steinberger](https://github.com/steipete)** - Creator of OpenClaw (formerly Moltbot/Clawdbot)
+- **[Peter Steinberger](https://github.com/steipete)** - Creator of OpenClaw
 - **[Next.js Team](https://nextjs.org/)** - For the incredible framework
 - **[Material-UI](https://mui.com/)** - For the beautiful component library
-- **Moltbot Community** - For inspiration and support 🔥
+- **OpenClaw Community** - For inspiration and support 🔥
 
 ---
 

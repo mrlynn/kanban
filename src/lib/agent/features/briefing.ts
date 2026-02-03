@@ -1,11 +1,11 @@
 /**
  * Daily Briefing Feature
  *
- * Moltbot reviews the board each morning and provides a personalized summary.
- * This is the first "proactive" feature that makes Moltbot feel like a teammate.
+ * The agent reviews the board each morning and provides a personalized summary.
+ * This is the first "proactive" feature that makes the agent feel like a teammate.
  */
 
-import { MoltbotAgent, BoardAnalysis, StuckTask } from '../core/agent';
+import { AgentCore, BoardAnalysis, StuckTask } from '../core/agent';
 import { getDb } from '@/lib/mongodb';
 import type { Task, Board } from '@/types/kanban';
 
@@ -43,7 +43,7 @@ export async function generateDailyBriefings(): Promise<BriefingResult> {
 
   for (const boardId of boardIds) {
     try {
-      const agent = new MoltbotAgent({
+      const agent = new AgentCore({
         userId: 'mike', // TODO: Multi-user support
         boardId,
       });
@@ -79,7 +79,7 @@ export async function generateDailyBriefings(): Promise<BriefingResult> {
 /**
  * Format the briefing message
  */
-function formatBriefing(agent: MoltbotAgent, analysis: BoardAnalysis): string {
+function formatBriefing(agent: AgentCore, analysis: BoardAnalysis): string {
   const greeting = agent.getGreeting();
   const lines: string[] = [];
 
@@ -197,7 +197,7 @@ function generateSuggestions(analysis: BoardAnalysis): string[] {
 export async function generateBriefingForBoard(
   boardId: string
 ): Promise<string> {
-  const agent = new MoltbotAgent({
+  const agent = new AgentCore({
     userId: 'mike',
     boardId,
   });

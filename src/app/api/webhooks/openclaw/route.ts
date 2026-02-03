@@ -51,7 +51,8 @@ export async function POST(request: NextRequest) {
       
       // Verify signature with integration's webhook secret
       if (integration.webhookSecret) {
-        // Accept both new and legacy header names
+        // Accept both new and legacy header names.
+        // X-Clawdbot-Signature is kept for backwards compatibility with older clients.
         const signature = request.headers.get('X-OpenClaw-Signature') 
           || request.headers.get('X-Clawdbot-Signature') 
           || '';
@@ -69,7 +70,8 @@ export async function POST(request: NextRequest) {
       const config = getWebhookConfigFromEnv();
       
       if (config.secret) {
-        // Accept both new and legacy header names
+        // Accept both new and legacy header names.
+        // X-Clawdbot-Signature is kept for backwards compatibility with older clients.
         const signature = request.headers.get('X-OpenClaw-Signature')
           || request.headers.get('X-Clawdbot-Signature')
           || '';
@@ -149,7 +151,7 @@ export async function POST(request: NextRequest) {
       );
       
       if (result.matchedCount === 0) {
-        await db.collection<OpenClawIntegration>('clawdbot_integrations').updateOne(
+        await db.collection<OpenClawIntegration>('openclaw_integrations').updateOne(
           { id: integration.id },
           updateOp
         );

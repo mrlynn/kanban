@@ -1,18 +1,18 @@
 # 🔥 Moltboard Rebrand Summary
 
-**Date:** 2026-01-31
-**Status:** Phase 1 Complete ✅
+**Date:** 2026-02-03
+**Status:** Phase 2 Complete ✅
 
 ---
 
-## What's Been Done
+## Phase 1 (2026-01-31) ✅
 
-### ✅ Core Configuration
+### Core Configuration
 - [x] **package.json** - Name changed to "moltboard"
 - [x] **Root layout metadata** - Title and description updated
 - [x] **README.md** - Comprehensive new README created with Moltboard branding
 
-### ✅ Documentation Files
+### Documentation Files
 All major documentation updated with Moltboard branding:
 - [x] **docs/OPENCLAW_PROPOSAL.md** - All references updated
 - [x] **docs/INDEPENDENT_IMPLEMENTATION_GUIDE.md** - Fully rebranded
@@ -22,178 +22,61 @@ All major documentation updated with Moltboard branding:
 
 ---
 
-## What's Next
+## Phase 2 (2026-02-03) ✅
 
-### 🚧 Priority 1: Component Files
+### Clawdbot → OpenClaw rename
+- [x] Types, webhook lib, API routes, env vars renamed
+- [x] Agent identity module created at `lib/agent-identity.ts`
+- [x] Components updated with legacy `moltbot` display aliases
 
-Rename these component files to remove "Kanban" naming:
+### lib/moltbot → lib/agent rename
+- [x] `src/lib/agent/core/agent.ts` — `MoltbotAgent` → `AgentCore`, `MoltbotContext` → `AgentContext`
+- [x] `src/lib/agent/features/stuck-detector.ts` — Uses `AgentCore`, `AGENT_ACTOR`
+- [x] `src/lib/agent/features/briefing.ts` — Uses `AgentCore`
+- [x] `src/lib/agent/features/task-creator.ts` — Uses `AGENT_ACTOR`, `isAgentActor`
+- [x] `src/lib/agent/features/nlp-parser.ts` — Copied (no brand references)
+- [x] `src/lib/agent/index.ts` — Updated exports
+- [x] `src/lib/moltbot/` directory deleted
 
-```bash
-# Recommended renames:
-src/components/KanbanBoard.tsx → src/components/BoardView.tsx
-src/components/KanbanColumn.tsx → src/components/BoardColumn.tsx
-src/types/kanban.ts → src/types/moltboard.ts or src/types/board.ts
-```
+### Import updates
+- [x] `src/app/api/cron/daily-briefing/route.ts` → `@/lib/agent/features/briefing`
+- [x] `src/app/api/cron/check-stuck/route.ts` → `@/lib/agent/features/stuck-detector`
+- [x] `src/app/api/chat/route.ts` — Already used `@/lib/agent/features/task-creator`
 
-**Impact:** Will require updating all imports across the codebase
+### MongoDB collection rename
+- [x] `'clawdbot_integrations'` → `'openclaw_integrations'` in all files
+- [x] Backwards-compat fallback queries retained for legacy data
 
-### 🚧 Priority 2: Environment & Database
+### Legal pages
+- [x] Privacy policy — "Moltbot" → "your AI assistant"
+- [x] Terms of service — "Moltbot" → "the AI assistant"
 
-Update environment variables and database:
+### Legacy header compatibility
+- [x] `X-Clawdbot-Signature` fallback kept with comment explaining it's for legacy support
 
-```bash
-# .env.local changes needed:
-KANBAN_API_KEY → MOLTBOARD_API_KEY
-
-# MongoDB database name:
-clawd_kanban → moltboard
-# (or keep as-is if you don't want to migrate data)
-```
-
-### 🚧 Priority 3: UI Text
-
-Check for any hardcoded "Kanban" text in UI components:
-- Page titles
-- Button labels
-- Help text
-- Error messages
-
-### 🚧 Priority 4: Branding Assets
-
-Create visual identity:
-- [ ] Logo design (transformation/molt theme)
-- [ ] Color palette (warm oranges/reds 🔥)
-- [ ] Favicon (multiple sizes)
-- [ ] Social media preview image (og:image)
-
-### 🚧 Priority 5: Domain Setup
-
-When ready for launch:
-- [ ] Register kanban.mlynn.org
-- [ ] Configure DNS
-- [ ] Set up Vercel deployment
-- [ ] SSL certificate
-- [ ] Update NEXTAUTH_URL in production
+### README.md
+- [x] Replaced remaining Moltbot references with "AI assistant" / "your OpenClaw agent"
 
 ---
 
-## Quick Reference
+## Backwards Compatibility Notes
 
-### New Brand Identity
-
-**Name:** Moltboard
-**Domain:** kanban.mlynn.org
-**Tagline:** "Task Management, Evolved"
-**Theme:** Transformation, evolution, molten energy 🔥
-**Colors:** Warm oranges/reds (like Moltbot's fire emoji)
-
-### Repository Info
-
-**GitHub:** github.com/mrlynn/moltboard (update repo name)
-**Author:** Michael Lynn (@mrlynn)
-**License:** MIT
-**Built for:** OpenClaw/Moltbot
-
-### Key Branding Points
-
-- Built specifically for OpenClaw/Moltbot integration
-- AI-native task management
-- Transform tasks into shipped work
-- Molting = growth, evolution, transformation
+- **Database actor field:** New records use `'agent'`; queries match both `'agent'` and `'moltbot'`
+- **MongoDB collections:** Code queries `'openclaw_integrations'` first, falls back to `'openclaw_integrations'` (legacy `'clawdbot_integrations'` references removed)
+- **Webhook headers:** `X-Clawdbot-Signature` still accepted alongside `X-OpenClaw-Signature`
+- **Env vars:** `CLAWDBOT_WEBHOOK_*` still accepted as fallback alongside `OPENCLAW_WEBHOOK_*`
+- **TypeScript exports:** `MoltbotAgent` and `MoltbotContext` kept as deprecated aliases
 
 ---
 
-## Files Changed Summary
+## What's Still Using "Kanban" (low priority, internal only)
 
-### Created
-- `README.md` - New comprehensive README
-- `docs/REBRANDING_CHECKLIST.md` - Full checklist
-- `REBRAND_SUMMARY.md` - This file
-
-### Modified
-- `package.json` - Name already was "moltboard"
-- `src/app/layout.tsx` - Metadata already updated
-- `docs/OPENCLAW_PROPOSAL.md` - All Kanban → Moltboard
-- `docs/INDEPENDENT_IMPLEMENTATION_GUIDE.md` - All Kanban → Moltboard
-- `docs/MOLTBOT_CHANNEL_INTEGRATION.md` - All Kanban → Moltboard
-
-### Still Using "Kanban"
-Files that still reference "Kanban" (safe to leave for now):
-- `src/components/KanbanBoard.tsx` - Functional, can rename later
-- `src/components/KanbanColumn.tsx` - Functional, can rename later
-- `src/types/kanban.ts` - Type definitions, can rename later
+Files that still reference "Kanban" (not user-facing):
+- `src/components/KanbanBoard.tsx` — Functional, can rename later
+- `src/components/KanbanColumn.tsx` — Functional, can rename later
+- `src/types/kanban.ts` — Type definitions, can rename later
 - Various imports of `@/types/kanban`
 
 ---
 
-## Should You Rename Files Now?
-
-**My recommendation: Not urgent**
-
-Reasons to wait:
-- Current names are internal (not user-facing)
-- Large refactor across many files
-- Could introduce bugs if not careful
-- Doesn't affect user experience
-
-Reasons to do it:
-- Cleaner codebase
-- Better alignment with brand
-- Easier for contributors to understand
-
-**Suggested approach:**
-1. Finish current features first
-2. Create a dedicated "refactor" branch
-3. Rename files systematically
-4. Test thoroughly
-5. Merge when stable
-
----
-
-## Testing Checklist
-
-Before going live with rebrand:
-- [ ] Verify all page titles say "Moltboard"
-- [ ] Check sign-in page branding
-- [ ] Confirm no "Kanban" in user-facing text
-- [ ] Test all features still work
-- [ ] Verify API endpoints work
-- [ ] Check environment variables
-- [ ] Confirm database connection
-- [ ] Test Moltbot integration (when built)
-
----
-
-## Communication Plan
-
-### Internal
-- Update GitHub repo name/description
-- Update any internal docs
-
-### External (when ready)
-- Announcement tweet/post
-- Share in OpenClaw Discord
-- Update any portfolios/showcases
-- Create marketing site (optional)
-
----
-
-## Next Session Goals
-
-**Immediate tasks:**
-1. Review this summary
-2. Decide on file rename timing
-3. Update environment variables if needed
-4. Start on Priority 1 tasks if desired
-
-**Can defer:**
-- Component file renaming
-- Database migration
-- Branding assets
-- Domain setup
-
----
-
-**Status:** Ready for next phase! 🚀
-
-**Questions?** See [docs/REBRANDING_CHECKLIST.md](docs/REBRANDING_CHECKLIST.md) for full details.
+**Status:** Rebrand complete! 🚀

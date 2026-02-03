@@ -1,12 +1,13 @@
 /**
- * Moltbot - The AI Teammate
+ * Agent - The AI Teammate
  *
- * Export all Moltbot features for easy importing.
+ * Export all agent features for easy importing.
  */
 
 // Core
-export { MoltbotAgent } from './core/agent';
+export { AgentCore, MoltbotAgent } from './core/agent';
 export type {
+  AgentContext,
   MoltbotContext,
   UserPatterns,
   BoardAnalysis,

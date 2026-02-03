@@ -13,23 +13,23 @@ import { signPayload } from '@/lib/openclaw-webhook';
 /**
  * Helper to find integration in new or legacy collection
  */
-async function findIntegration(db: any, tenantId: string, userId: string): Promise<OpenClawIntegration | null> {
+async function findIntegration(db: Awaited<ReturnType<typeof getDb>>, tenantId: string, userId: string): Promise<OpenClawIntegration | null> {
   const filter = { tenantId, userId };
   const result = await db.collection<OpenClawIntegration>('openclaw_integrations').findOne(filter);
   if (result) return result;
-  return await db.collection<OpenClawIntegration>('clawdbot_integrations').findOne(filter);
+  return await db.collection<OpenClawIntegration>('openclaw_integrations').findOne(filter);
 }
 
 /**
  * Helper to update integration in the correct collection
  */
-async function updateIntegration(db: any, integrationId: string, update: any): Promise<void> {
+async function updateIntegration(db: Awaited<ReturnType<typeof getDb>>, integrationId: string, update: any): Promise<void> {
   const result = await db.collection<OpenClawIntegration>('openclaw_integrations').updateOne(
     { id: integrationId },
     update
   );
   if (result.matchedCount === 0) {
-    await db.collection<OpenClawIntegration>('clawdbot_integrations').updateOne(
+    await db.collection<OpenClawIntegration>('openclaw_integrations').updateOne(
       { id: integrationId },
       update
     );

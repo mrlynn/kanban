@@ -29,7 +29,7 @@ export function getWebhookConfigFromEnv(): WebhookConfig {
 /**
  * Get user's OpenClaw integration from database
  * 
- * NOTE: Collection was renamed from 'clawdbot_integrations' to 'openclaw_integrations'.
+ * NOTE: Collection was renamed from 'openclaw_integrations' to 'openclaw_integrations'.
  * We query both for backwards compatibility with existing data.
  */
 export async function getUserIntegration(
@@ -53,7 +53,7 @@ export async function getUserIntegration(
     
     // Backwards compatibility: check legacy collection name
     return await db
-      .collection<OpenClawIntegration>('clawdbot_integrations')
+      .collection<OpenClawIntegration>('openclaw_integrations')
       .findOne(filter);
   } catch (error) {
     console.error('[openclaw-webhook] Failed to fetch integration:', error);
@@ -79,7 +79,7 @@ export async function findIntegrationByApiKey(
     if (result) return result;
     
     return await db
-      .collection<OpenClawIntegration>('clawdbot_integrations')
+      .collection<OpenClawIntegration>('openclaw_integrations')
       .findOne(filter);
   } catch (error) {
     console.error('[openclaw-webhook] Failed to find integration by key:', error);
@@ -294,7 +294,7 @@ async function updateIntegrationSuccess(integrationId: string): Promise<void> {
     );
     
     if (result.matchedCount === 0) {
-      await db.collection<OpenClawIntegration>('clawdbot_integrations').updateOne(
+      await db.collection<OpenClawIntegration>('openclaw_integrations').updateOne(
         { id: integrationId },
         update
       );
@@ -326,7 +326,7 @@ async function updateIntegrationError(integrationId: string, error: string): Pro
     );
     
     if (result.matchedCount === 0) {
-      await db.collection<OpenClawIntegration>('clawdbot_integrations').updateOne(
+      await db.collection<OpenClawIntegration>('openclaw_integrations').updateOne(
         { id: integrationId },
         update
       );

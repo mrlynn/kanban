@@ -27,7 +27,7 @@ function generateSecret(): string {
 /**
  * Helper to find integration in new or legacy collection
  */
-async function findIntegration(db: any, tenantId: string, userId: string): Promise<OpenClawIntegration | null> {
+async function findIntegration(db: Awaited<ReturnType<typeof getDb>>, tenantId: string, userId: string): Promise<OpenClawIntegration | null> {
   const filter = { tenantId, userId };
   
   const result = await db
@@ -38,7 +38,7 @@ async function findIntegration(db: any, tenantId: string, userId: string): Promi
   
   // Backwards compatibility: check legacy collection
   return await db
-    .collection<OpenClawIntegration>('clawdbot_integrations')
+    .collection<OpenClawIntegration>('openclaw_integrations')
     .findOne(filter);
 }
 
@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
       );
       
       if (result.matchedCount === 0) {
-        await db.collection<OpenClawIntegration>('clawdbot_integrations').updateOne(
+        await db.collection<OpenClawIntegration>('openclaw_integrations').updateOne(
           { id: existing.id },
           { $set: updates }
         );
@@ -225,7 +225,7 @@ export async function DELETE(request: NextRequest) {
       .deleteOne({ tenantId: context.tenantId, userId });
     
     const result2 = await db
-      .collection<OpenClawIntegration>('clawdbot_integrations')
+      .collection<OpenClawIntegration>('openclaw_integrations')
       .deleteOne({ tenantId: context.tenantId, userId });
 
     if (result1.deletedCount === 0 && result2.deletedCount === 0) {
