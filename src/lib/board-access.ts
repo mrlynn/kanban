@@ -1,11 +1,17 @@
 import { getDb } from './mongodb';
 import { Board } from '@/types/kanban';
 import { BoardMember, BoardRole, ROLE_PERMISSIONS } from '@/types/team';
-import { AuthContext } from '@/types/tenant';
+import { AuthContext, TenantUser } from '@/types/tenant';
 
 /**
  * Check if user has access to a board
  * Returns the user's role if they have access, null otherwise
+ * 
+ * Access hierarchy:
+ * 1. Tenant owner → owner role on all boards
+ * 2. Tenant admin → editor role on all boards
+ * 3. Tenant member → editor role on all boards
+ * 4. Board member → their specific board role
  */
 export async function getBoardAccess(
   boardId: string,
@@ -13,19 +19,45 @@ export async function getBoardAccess(
 ): Promise<{ role: BoardRole; member: BoardMember | null } | null> {
   const db = await getDb();
   
-  // First check if user owns the board via tenant
+  // Get the board first
   const board = await db.collection<Board>('boards').findOne({
     id: boardId,
-    tenantId: context.tenantId,
   });
   
-  if (board) {
+  if (!board) {
+    return null;
+  }
+  
+  // Check if user owns the board via tenant (the board belongs to user's active tenant)
+  if (board.tenantId === context.tenantId) {
     // User is tenant owner - they have owner access to all boards
     return { role: 'owner', member: null };
   }
   
-  // Check if user is a board member
+  // Check if user is a tenant member (workspace-wide access)
   if (context.userId) {
+    const user = context.user || await db.collection<TenantUser>('users').findOne({
+      id: context.userId,
+    });
+    
+    if (user) {
+      const tenantMembership = user.memberships.find(
+        m => m.tenantId === board.tenantId
+      );
+      
+      if (tenantMembership) {
+        // Tenant members get editor access to all boards in the workspace
+        // Owner gets owner role, admin/member get editor role
+        if (tenantMembership.role === 'owner') {
+          return { role: 'owner', member: null };
+        } else {
+          // Admin and member both get editor access to all boards
+          return { role: 'editor', member: null };
+        }
+      }
+    }
+    
+    // Check if user is a board member (individual board sharing)
     const member = await db.collection<BoardMember>('boardMembers').findOne({
       boardId,
       userId: context.userId,
